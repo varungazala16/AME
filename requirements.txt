@@ -181,7 +181,6 @@ mccabe
 mdit-py-plugins
 mdurl
 mediapipe==0.10.21
-menuinst
 mistune
 ml_dtypes==0.5.1
 more-itertools
