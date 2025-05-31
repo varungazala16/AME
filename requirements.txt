@@ -37,7 +37,7 @@ charset-normalizer
 click
 cloudpathlib==0.16.0
 cloudpickle
-clyent==1.2.2
+clyent
 colorama
 colorcet
 coloredlogs==15.0.1
