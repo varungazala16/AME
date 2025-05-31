@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: flask-analyze-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    plan: free
+    envVars:
+      - key: SUPABASE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mbHRocWZsYXprZ3dvd25ld3JjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MjI0NTkyMCwiZXhwIjoyMDU3ODIxOTIwfQ.mh-QAZaPHsc4I2fcCtxageGcDXrCkGjiiVdJF7g5L9A
