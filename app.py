@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from supabase import create_client, Client
 from TimedUpGo import analyze_sit_to_stand
 from fingertap import count_taps
@@ -6,12 +7,14 @@ from HandPronation import count_flip_flops
 from FistOpenClose import count_fist_openClose
 import os
 
+
 # Initialize Supabase client
 url = "https://nflthqflazkgwownewrc.supabase.co"
 key = os.environ.get("SUPABASE_KEY")
 supabase = create_client(url, key)
 
 app = Flask(__name__)
+CORS(app)
 
 def run_analysis_for_task(task_id, video_path):
     if task_id == 1:
@@ -47,14 +50,8 @@ def get_latest_task_result_for_recording(recording_id):
         .execute()
     return resp.data[0] if resp.data else None
 
-# @app.route('/analyze', methods=['POST'])
-# def analyze_video():
-
 @app.route('/analyze', methods=['POST'])
 def analyze_video():
-    print("Received /analyze test request")
-    return jsonify({"status": "ok"})
-
     """
     Expects JSON:
     {
@@ -90,5 +87,15 @@ def analyze_video():
         "latest_result": latest_result
     })
 
+
+
+@app.route('/', methods=['GET'])
+def analyze_video():
+    print("Received test request")
+    return jsonify({"status": "ok"})
+
+
 if __name__ == "__main__":
     app.run(port=5001, debug=True)
+    
+
