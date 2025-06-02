@@ -47,8 +47,14 @@ def get_latest_task_result_for_recording(recording_id):
         .execute()
     return resp.data[0] if resp.data else None
 
+# @app.route('/analyze', methods=['POST'])
+# def analyze_video():
+
 @app.route('/analyze', methods=['POST'])
 def analyze_video():
+    print("Received /analyze test request")
+    return jsonify({"status": "ok"})
+
     """
     Expects JSON:
     {
