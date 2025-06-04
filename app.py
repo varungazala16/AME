@@ -6,7 +6,7 @@ from HandPronation import count_flip_flops
 from FistOpenClose import count_fist_openClose
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
 
 def run_analysis_for_task(task_id, video_path):
     if task_id == 1:
