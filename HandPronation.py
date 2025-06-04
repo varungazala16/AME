@@ -119,10 +119,3 @@ def count_flip_flops(video_path, hand):
     cap.release()
     cv2.destroyAllWindows()
     return [str(flip_flop_count)]
-
-
-video_path = "2025-05-31T18_36_51.048Z-task-9.webm"
-hand_to_track = "right"
-
-result = count_flip_flops(video_path, hand_to_track)
-print(result[0])
