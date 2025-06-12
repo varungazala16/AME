@@ -30,40 +30,37 @@ def run_analysis_for_task(task_id, video_path):
     elif task_id == 10:
         result = count_fist_openClose(video_path)
     else:
-        result = ["44", "none"]
+        result = {"status": "unknown task"}
     return result
 
 @app.route('/analyze', methods=['POST'])
-def analyze_recordings():
+def analyze_single_recording():
     """
     Expects JSON:
     {
-      "recordings": [
-        {
-          "id": "recording_id",
-          "task_id": 1,
-          "recording_url": "https://..."
-        },
-        ...
-      ]
+      "recording_id": "rec_123",
+      "task_id": 1,
+      "recording_url": "https://..."
     }
     """
     data = request.get_json()
-    recordings = data.get('recordings', [])
-    analysis_results = []
+    if not data:
+        return jsonify({"error": "No JSON data received"}), 400
 
-    for rec in recordings:
-        task_id = rec.get('task_id')
-        video_path = rec.get('recording_url')
-        recording_id = rec.get('id')
-        result = run_analysis_for_task(task_id, video_path)
-        analysis_results.append({
-            "recording_id": recording_id,
-            "task_id": task_id,
-            "metrics": result
-        })
+    task_id = data.get('task_id')
+    video_path = data.get('recording_url')
+    recording_id = data.get('recording_id')
 
-    return jsonify({"results": analysis_results})
+    if not all([task_id, video_path, recording_id]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    result = run_analysis_for_task(task_id, video_path)
+
+    return jsonify({
+        "recording_id": recording_id,
+        "task_id": task_id,
+        "metrics": result
+    })
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)
