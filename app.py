@@ -8,7 +8,9 @@ from RombergOutstretch import analyze_romberg_outstretch
 from FootStomp import count_stomps
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+CORS(app,
+     supports_credentials=True,
+     resources={r"/*": {"origins": r".*"}}) 
 
 def run_analysis_for_task(task_id, video_path):
     if task_id == 1:
@@ -37,7 +39,7 @@ def run_analysis_for_task(task_id, video_path):
         result = ["unknown task"]
     return result
 
-@app.route('/analyze', methods=['POST'])
+@app.route('/analyze', methods=['POST', 'OPTIONS'])
 def analyze_single_recording():
     """
     Expects JSON:
