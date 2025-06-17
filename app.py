@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from TimedUpGo import analyze_sit_to_stand
-from fingertap import count_taps
-from HandPronation import count_flip_flops
+from HandPronation import flip_flops
 from FistOpenClose import count_fist_openClose
+from fingertap import count_taps
+from RombergOutstretch import analyze_romberg_outstretch
+from FootStomp import count_stomps
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -16,7 +18,7 @@ def run_analysis_for_task(task_id, video_path):
     elif task_id == 3:
         result = {"steps": 12}
     elif task_id == 4:
-        result = {"duration": 15}
+        result = analyze_romberg_outstretch(video_path)
     elif task_id == 5:
         result = {"duration": 8}
     elif task_id == 6:
@@ -26,11 +28,13 @@ def run_analysis_for_task(task_id, video_path):
     elif task_id == 8:
         result = count_taps(video_path)
     elif task_id == 9:
-        result = count_flip_flops(video_path, "right")
+        result = flip_flops(video_path)
     elif task_id == 10:
         result = count_fist_openClose(video_path)
+    elif task_id == 11:
+        result = count_stomps(video_path)
     else:
-        result = {"status": "unknown task"}
+        result = ["unknown task"]
     return result
 
 @app.route('/analyze', methods=['POST'])

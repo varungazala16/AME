@@ -3,203 +3,171 @@ import mediapipe as mp
 import numpy as np
 from collections import deque
 
-# Initialize MediaPipe
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
-
 class FingerTapDetector:
     def __init__(self, video_path):
         self.video_path = video_path
         
-        # Detection parameters
-        self.velocity_threshold = 0.020         # Lower to detect more subtle finger movements
-        self.direction_change_threshold = 0.4   # Slightly relaxed for easier direction change detection
-        self.min_frames_between_taps = 4        # Reduce debounce time to catch faster taps
-        self.history_length = 15                # Slightly extended history for smoother velocity analysis
- # Number of frames to track for movement analysis
+        # Simple, reliable parameters
+        self.history_length = 10
+        self.min_frames_between_taps = 4
         
         # State tracking
-        self.position_history = deque(maxlen=self.history_length)
-        self.velocity_history = deque(maxlen=self.history_length)
-        self.tap_locations = []            # Store frame numbers where taps occur
+        self.distance_history = deque(maxlen=self.history_length)
         self.tap_count = 0
-        self.last_tap_frame = -self.min_frames_between_taps  # Initialize to allow immediate first tap
+        self.tap_locations = []
+        self.last_tap_frame = -self.min_frames_between_taps
         
-        # For visualization
-        self.distance_buffer = []          # Store distances for the whole video
-        self.velocity_buffer = []          # Store velocities for the whole video
-        self.frame_indices = []            # Store frame numbers for plotting
+        # For analysis
+        self.all_distances = []
+        self.frame_count = 0
         
-        # Debug flags
-        self.debug = True
-        self.plot_results = True
-    
-    def analyze_velocity_pattern(self, positions, frame_idx):
-        """Analyze velocity patterns to detect taps based on characteristic finger movements"""
-        if len(positions) < 3:
-            return False  # Need at least 3 frames for analysis
+        # Adaptive parameters
+        self.distance_threshold = None
+        self.min_distance_seen = float('inf')
+        self.max_distance_seen = 0
         
-        # Calculate recent velocities (changes in distance)
-        recent_velocities = [positions[i] - positions[i-1] for i in range(1, len(positions))]
+    def detect_tap(self, current_distance, frame_idx):
+        """Simple and effective tap detection"""
         
-        # Check if we have enough history to detect pattern
-        if len(recent_velocities) < 3:
+        # Update min/max for adaptive threshold
+        self.min_distance_seen = min(self.min_distance_seen, current_distance)
+        self.max_distance_seen = max(self.max_distance_seen, current_distance)
+        
+        # Calculate adaptive threshold after seeing some data
+        if frame_idx > 30:  # After 30 frames
+            distance_range = self.max_distance_seen - self.min_distance_seen
+            # Threshold is 30% above minimum distance
+            self.distance_threshold = self.min_distance_seen + (distance_range * 0.3)
+        
+        # Add current distance to history
+        self.distance_history.append(current_distance)
+        
+        # Need at least 5 frames for detection
+        if len(self.distance_history) < 5:
             return False
             
-        # A tap typically involves:
-        # 1. Decreasing distance (negative velocity) - fingers coming together
-        # 2. Followed by increasing distance (positive velocity) - fingers moving apart
+        # Simple tap detection logic:
+        # 1. Current distance is below threshold (fingers close)
+        # 2. Was above threshold recently (fingers were apart)
+        # 3. Minimum time has passed since last tap
         
-        # Find where velocity changes from negative to positive (change in direction)
-        direction_changes = []
-        for i in range(1, len(recent_velocities)):
-            if recent_velocities[i-1] < 0 and recent_velocities[i] > 0:
-                direction_changes.append(i)
+        if self.distance_threshold is None:
+            return False
+            
+        # Check if we're currently in a "tap" state (fingers close)
+        fingers_close = current_distance < self.distance_threshold
         
-        # Find significant velocity changes (magnitude of change)
-        significant_changes = []
-        for i in range(1, len(recent_velocities)):
-            if abs(recent_velocities[i] - recent_velocities[i-1]) > self.velocity_threshold:
-                significant_changes.append(i)
+        # Check if fingers were apart recently
+        recent_distances = list(self.distance_history)[-5:]  # Last 5 frames
+        was_apart_recently = any(d > self.distance_threshold for d in recent_distances[:-1])
         
-        # Detect tap pattern - intersection of direction and significant changes
-        # with debounce to prevent multiple detections
-        for change_idx in direction_changes:
-            if change_idx in significant_changes:
-                if frame_idx - self.last_tap_frame >= self.min_frames_between_taps:
-                    self.last_tap_frame = frame_idx
-                    return True
-                    
-        return False
+        # Detect tap: fingers were apart, now they're close
+        is_tap = (fingers_close and 
+                 was_apart_recently and 
+                 (frame_idx - self.last_tap_frame) >= self.min_frames_between_taps)
+        
+        if is_tap:
+            self.last_tap_frame = frame_idx
+            
+        return is_tap
     
-    def process_video(self):
+    def process_video(self, start_time_sec=0.0, end_time_sec=None):
         cap = cv2.VideoCapture(self.video_path)
         if not cap.isOpened():
             print("❌ Error: Could not open video.")
-            return
-        
+            return 0
+
         # Get video properties
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps <= 0 or fps > 240:
-            fps = 30  # Default if invalid
-            
-            # Initialize MediaPipe Hands
+            fps = 30
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        print(f"🎬 Processing video at {fps:.1f} FPS, total frames: {total_frames}")
+
+        # Seek to start time
+        cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
+
+        # Initialize MediaPipe
+        mp_hands = mp.solutions.hands
+
         with mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=1,
             model_complexity=1,
-            min_detection_confidence=0.3,
+            min_detection_confidence=0.5,
             min_tracking_confidence=0.3
         ) as hands:
+
             frame_idx = 0
-            
+            frames_with_hands = 0
+
             while True:
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-                    
-                    frame_idx += 1
-                    time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-                    if time_sec <= 0:
-                        time_sec = frame_idx / fps
-                    
-                    # Process image
-                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    results = hands.process(rgb)
-                    
-                    thumb_x, thumb_y = None, None
-                    index_x, index_y = None, None
-                    distance = None
-                    velocity = None
-                    is_tap = False
-                    
-                    # Draw hand landmarks and extract fingertip positions
-                    if results.multi_hand_landmarks:
-                        for hand_landmarks in results.multi_hand_landmarks:
-                            # Draw hand skeleton
-                            mp_drawing.draw_landmarks(
-                                frame,
-                                hand_landmarks,
-                                mp_hands.HAND_CONNECTIONS,
-                                mp_drawing_styles.get_default_hand_landmarks_style(),
-                                mp_drawing_styles.get_default_hand_connections_style()
-                            )
-                            
-                            # Get thumb and index finger tip positions
-                            thumb = hand_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
-                            index = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
-                            
-                            # Ensure valid coordinates
-                            thumb_x = max(0.0, min(1.0, thumb.x))
-                            thumb_y = max(0.0, min(1.0, thumb.y))
-                            index_x = max(0.0, min(1.0, index.x))
-                            index_y = max(0.0, min(1.0, index.y))
-                            
-                            # Calculate 2D Euclidean distance
-                            distance = np.sqrt((thumb_x - index_x)**2 + (thumb_y - index_y)**2)
-                            
-                            # Add to position history
-                            self.position_history.append(distance)
-                            
-                            # Calculate velocity if we have enough history
-                            if len(self.position_history) >= 2:
-                                velocity = self.position_history[-1] - self.position_history[-2]
-                                self.velocity_history.append(velocity)
-                            
-                            # Detect tap based on movement pattern
-                            if len(self.position_history) == self.history_length:
-                                is_tap = self.analyze_velocity_pattern(list(self.position_history), frame_idx)
-                                if is_tap:
-                                    self.tap_count += 1
-                                    self.tap_locations.append(frame_idx)
-                                    print(f"Tap #{self.tap_count} detected at frame {frame_idx}, time {time_sec:.2f}s")
-                            
-                            # Draw fingertip markers with color based on tap state
-                            tip_color = (0, 255, 0) if is_tap else (0, 0, 255)
-                            tp = (int(thumb_x * width), int(thumb_y * height))
-                            ip = (int(index_x * width), int(index_y * height))
-                            cv2.circle(frame, tp, 12, tip_color, -1)
-                            cv2.circle(frame, ip, 12, tip_color, -1)
-                            cv2.line(frame, tp, ip, tip_color, 3)
-                    
-                    # Save data for plotting
-                    if distance is not None:
-                        self.distance_buffer.append(distance)
-                        if velocity is not None:
-                            self.velocity_buffer.append(velocity)
-                        else:
-                            self.velocity_buffer.append(0)
-                        self.frame_indices.append(frame_idx)
-                    
-                    # Draw information on frame
-                    cv2.putText(frame, f"Taps: {self.tap_count}", (10, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    
-                    if distance is not None:
-                        cv2.putText(frame, f"Distance: {distance:.3f}", (10, height - 60),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                    
-                    if velocity is not None:
-                        vel_color = (0, 0, 255) if velocity < 0 else (0, 255, 0)
-                        cv2.putText(frame, f"Velocity: {velocity:.3f}", (10, height - 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, vel_color, 2)
-                    
-                    # Progress display
-                    if frame_idx % int(fps) == 0:
-                        print(f"Processed {frame_idx} frames, taps={self.tap_count}")
-        
-        # Close video resources
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                frame_idx += 1
+                time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+
+                if time_sec < start_time_sec:
+                    continue
+
+                # Stop if beyond end time
+                if end_time_sec is not None and time_sec > end_time_sec:
+                    break
+
+                # Convert to RGB and process
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = hands.process(rgb)
+
+                if results.multi_hand_landmarks:
+                    frames_with_hands += 1
+
+                    for hand_landmarks in results.multi_hand_landmarks:
+                        # Extract thumb and index tips
+                        thumb = hand_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
+                        index = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+
+                        # Compute distance
+                        current_distance = np.sqrt((thumb.x - index.x)**2 + (thumb.y - index.y)**2)
+                        self.all_distances.append(current_distance)
+
+                        # Detect tap
+                        if self.detect_tap(current_distance, frame_idx):
+                            self.tap_count += 1
+                            self.tap_locations.append(frame_idx)
+                            print(f"✅ TAP #{self.tap_count} at frame {frame_idx} ({time_sec:.2f}s)")
+
+                # Optional: print every few seconds
+                if frame_idx % int(fps * 2) == 0:
+                    print(f"⏳ Frame {frame_idx} | Taps: {self.tap_count}")
+
         cap.release()
-        cv2.destroyAllWindows()
-        
-        print(f"Final taps: {self.tap_count}")
+
+        # Summary
+        print("\n📊 ANALYSIS SUMMARY")
+        print(f"🎯 Taps detected: {self.tap_count}")
+        print(f"📍 Tap frames: {self.tap_locations}")
+        print(f"📏 Distance range: {min(self.all_distances):.4f} - {max(self.all_distances):.4f}" if self.all_distances else "No distance data.")
+        print(f"🎚️ Threshold used: {self.distance_threshold:.4f}" if self.distance_threshold else "❌ No threshold set")
+        if frames_with_hands == 0:
+            print("⚠️ No hands detected in video.")
+
         return self.tap_count
 
 def count_taps(video_path):
-    detector = FingerTapDetector(video_path)
-    tap_count = detector.process_video()
-    print(f"Detection complete. Found {tap_count} finger taps.")
-    return [str(tap_count)]
+    """Count finger taps in a video file"""
+    print(f"🚀 Starting finger tap detection...")
+    print(f"📁 Video file: {video_path}")
+    
+    try:
+        detectorL = FingerTapDetector(video_path)
+        tap_countL = detectorL.process_video(6.0, 16.0)
+        detectorR = FingerTapDetector(video_path)
+        tap_countR = detectorR.process_video(28.0, 38.0)
+        print(f"\n✅ FINAL RESULT: {tap_countL} and {tap_countR} finger taps detected")
+        return [str(tap_countL), str(tap_countR)]
+    
+    except Exception as e:
+        print(f"❌ Error during processing: {e}")
+        return ["0","0"]

@@ -2,10 +2,9 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from collections import deque
-import time
 
-def count_flip_flops(video_path, hand):
-    # Validate hand input
+def count_flip_flops(video_path, hand, start_time_sec=0.0, end_time_sec=None):
+
     HAND_TO_TRACK = hand.lower()
     if HAND_TO_TRACK not in ['left', 'right']:
         raise ValueError("hand must be 'left' or 'right'")
@@ -13,13 +12,8 @@ def count_flip_flops(video_path, hand):
     FLIP_THRESHOLD = -30
     FLOP_THRESHOLD = 30
     DEBOUNCE_FRAMES = 3
-    FRAME_DELAY = 1
-    ZOOM_SIZE = 200
-    RUN_TIME = 30  # seconds
 
     mp_hands = mp.solutions.hands
-    mp_drawing = mp.solutions.drawing_utils
-    mp_drawing_styles = mp.solutions.drawing_styles
 
     hands = mp_hands.Hands(
         static_image_mode=False,
@@ -34,27 +28,36 @@ def count_flip_flops(video_path, hand):
         print(f"Error: Could not open video file {video_path}")
         return 0
 
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps <= 1e-2:
+        fps = 30.0
+
+    # Seek to start time
+    cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
+
     flip_flop_count = 0
     current_state = "neutral"
     state_history = deque(maxlen=DEBOUNCE_FRAMES)
-    last_valid_pos = None
+    frame_idx = 0
 
-    start_time = time.time()
-    end_processing_time = start_time + RUN_TIME
-    frames_processed_count = 0
-
-    while time.time() < end_processing_time:
+    while True:
         ret, frame = cap.read()
         if not ret:
-            # End of video
             break
 
-        frames_processed_count += 1
+        frame_idx += 1
+        timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+
+        if timestamp < start_time_sec:
+            continue
+
+        if end_time_sec is not None and timestamp > end_time_sec:
+            break
+
         h, w = frame.shape[:2]
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = hands.process(rgb_frame)
 
-        detected_hand_for_tracking_in_frame = False
         if results.multi_hand_landmarks:
             for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
                 handedness_classification = results.multi_handedness[i].classification[0]
@@ -62,33 +65,22 @@ def count_flip_flops(video_path, hand):
                 if handedness_label != HAND_TO_TRACK:
                     continue
 
-                detected_hand_for_tracking_in_frame = True
-
-                # --- Palm orientation calculation ---
-                wrist = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST]
+                # Palm orientation angle calculation
                 mid_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
                 pinky_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_MCP]
 
-                wrist_pt = (int(wrist.x * w), int(wrist.y * h))
                 mid_pt = (int(mid_mcp.x * w), int(mid_mcp.y * h))
                 pinky_pt = (int(pinky_mcp.x * w), int(pinky_mcp.y * h))
+
                 palm_vector = np.array([mid_pt[0] - pinky_pt[0], mid_pt[1] - pinky_pt[1]])
                 angle = np.degrees(np.arctan2(palm_vector[1], palm_vector[0]))
+
                 if HAND_TO_TRACK == 'left':
                     angle = (angle - 90) % 360 - 180
                 else:
                     angle = (angle + 90) % 360 - 180
 
-                last_valid_pos = wrist_pt
-
-                # Draw landmarks (optional, remove for headless/server use)
-                # mp_drawing.draw_landmarks(
-                #     frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
-                #     mp_drawing_styles.get_default_hand_landmarks_style(),
-                #     mp_drawing_styles.get_default_hand_connections_style()
-                # )
-
-                # --- State machine ---
+                # Determine current state
                 if angle < FLIP_THRESHOLD:
                     new_state = "flip"
                 elif angle > FLOP_THRESHOLD:
@@ -100,22 +92,20 @@ def count_flip_flops(video_path, hand):
 
                 if len(state_history) == DEBOUNCE_FRAMES:
                     if 'flip' in state_history and current_state != "flip":
-                        print("step-2 (flip region detected!)")
                         if current_state == "flop":
-                            print("Increment flip_flop_count (transition flop → flip)")
                             flip_flop_count += 1
                         current_state = "flip"
                     elif 'flop' in state_history and current_state != "flop":
-                        print("All FLOP detected, set current_state to flop")
                         current_state = "flop"
                     elif 'neutral' in state_history and current_state != "neutral":
-                        print("All NEUTRAL detected, set current_state to neutral")
                         current_state = "neutral"
 
-        # For speed (remove frame display for server/batch use)
-        # if cv2.waitKey(FRAME_DELAY) & 0xFF == ord('q'):
-        #     break
-
     cap.release()
-    cv2.destroyAllWindows()
-    return [str(flip_flop_count)]
+    hands.close()
+    return flip_flop_count
+
+
+def flip_flops(video_path):
+    left_pronation = count_flip_flops(video_path,"left", 5, 15) 
+    right_pronation = count_flip_flops(video_path,"right", 24, 34)
+    return [str(left_pronation), str(right_pronation)]

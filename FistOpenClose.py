@@ -53,17 +53,18 @@ class FistClosureDetector:
         self.fist_count = 0
         self.debug = True   # Set to True for print statements, False for silent
 
-    def process_video(self):
+    def process_video(self, start_time_sec=0.0, end_time_sec=None):
         cap = cv2.VideoCapture(self.video_path)
         if not cap.isOpened():
             print("Error opening video.")
             return 0
 
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps <= 1e-2:
             fps = 30.0
+
+        # Seek to start time (in milliseconds)
+        cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
 
         stable_buffer = deque(maxlen=2)
         stable_state = None
@@ -80,37 +81,48 @@ class FistClosureDetector:
                 ret, frame = cap.read()
                 if not ret:
                     break
+
                 frame_idx += 1
                 timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
 
+                if timestamp < start_time_sec:
+                    continue
+
+                if end_time_sec is not None and timestamp > end_time_sec:
+                    break
+
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 result = hands.process(rgb)
-                current_state = "open"
 
+                current_state = "open"
                 if result.multi_hand_landmarks:
                     for hand in result.multi_hand_landmarks:
                         if is_fist(hand.landmark):
                             current_state = "closed"
-                        mp_drawing.draw_landmarks(frame, hand, mp_hands.HAND_CONNECTIONS)
+                            break  # Only one closed hand is enough to count
 
                 stable_buffer.append(current_state)
+
                 if stable_buffer.count("closed") >= 1:
                     if stable_state != "closed":
                         fist_count += 1
                         if self.debug:
-                            print(f"Frame {frame_idx}: Fist Closed")
+                            print(f"Frame {frame_idx} ({timestamp:.2f}s): Fist Closed")
                     stable_state = "closed"
                 elif stable_buffer.count("open") >= 1:
                     stable_state = "open"
 
         cap.release()
+
         if self.debug:
             print(f"Final fist closure count: {fist_count}")
         return fist_count
 
 def count_fist_openClose(video_path):
-    detector = FistClosureDetector(video_path)
-    fist_count = detector.process_video()
-    return [str(fist_count)]
+    detectorL = FistClosureDetector(video_path)
+    fist_countL = detectorL.process_video(4,14)
+    detectorR = FistClosureDetector(video_path)
+    fist_countR = detectorR.process_video(25,35)
+    return [str(fist_countL), str(fist_countR)]
 
 
