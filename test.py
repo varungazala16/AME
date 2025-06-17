@@ -1,6 +1,6 @@
 import requests
 
-url = "http://127.0.0.1:10000/analyze"
+url = "https://ame-new.onrender.com/analyze"
 payload = {
     "recording_id": "812a2cfb-f68c-475f-89a0-76fa442313ac",
     "task_id": 10,

@@ -10,8 +10,7 @@ from FootStomp import count_stomps
 app = Flask(__name__)
 CORS(app,
      supports_credentials=True,
-     resources={r"/*": {"origins": "*"}},  # use "*" for dev
-     allow_headers=["Content-Type"])
+     resources={r"/*": {"origins": r"http://localhost:\d+"}})
 
 def run_analysis_for_task(task_id, video_path):
     if task_id == 1:
