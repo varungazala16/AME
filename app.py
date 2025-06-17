@@ -10,7 +10,8 @@ from FootStomp import count_stomps
 app = Flask(__name__)
 CORS(app,
      supports_credentials=True,
-     resources={r"/*": {"origins": r".*"}}) 
+     resources={r"/*": {"origins": "*"}},  # use "*" for dev
+     allow_headers=["Content-Type"])
 
 def run_analysis_for_task(task_id, video_path):
     if task_id == 1:
@@ -50,6 +51,8 @@ def analyze_single_recording():
     }
     """
     data = request.get_json()
+    if request.method == 'OPTIONS':
+        return '', 204
     if not data:
         return jsonify({"error": "No JSON data received"}), 400
 
