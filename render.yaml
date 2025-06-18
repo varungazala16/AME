@@ -6,4 +6,3 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     plan: free
     autoDeploy: true
-    pythonVersion: 3.9

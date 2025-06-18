@@ -53,35 +53,41 @@ def analyze_single_recording():
       "recording_url": "https://..."
     }
     """
-    if request.method == 'OPTIONS':
-        response = make_response()
+    try:
+        if request.method == 'OPTIONS':
+            response = make_response()
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
+            response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+            response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+            return response, 200
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data received"}), 400
+
+        task_id = data.get('task_id')
+        video_path = data.get('recording_url')
+        recording_id = data.get('recording_id')
+
+        if not all([task_id, video_path, recording_id]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        result = run_analysis_for_task(task_id, video_path)
+
+        response = jsonify({
+            "recording_id": recording_id,
+            "task_id": task_id,
+            "metrics": result
+        })
         response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response, 200
-
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data received"}), 400
-
-    task_id = data.get('task_id')
-    video_path = data.get('recording_url')
-    recording_id = data.get('recording_id')
-
-    if not all([task_id, video_path, recording_id]):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    result = run_analysis_for_task(task_id, video_path)
-
-    response = jsonify({
-        "recording_id": recording_id,
-        "task_id": task_id,
-        "metrics": result
-    })
-    response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
-    response.headers.add("Access-Control-Allow-Credentials", "true")
-    return response
+        return response
+    
+    except Exception as e:
+        import traceback
+        print("🔥 Exception occurred:", traceback.format_exc())
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)
