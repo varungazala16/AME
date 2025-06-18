@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from TimedUpGo import analyze_sit_to_stand
 from HandPronation import flip_flops
@@ -8,9 +8,13 @@ from RombergOutstretch import analyze_romberg_outstretch
 from FootStomp import count_stomps
 
 app = Flask(__name__)
+
+# Updated CORS configuration
 CORS(app,
      supports_credentials=True,
-     resources={r"/*": {"origins": r"http://localhost:\d+"}})
+     resources={r"/*": {"origins": "http://localhost:5173"}},
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"])
 
 def run_analysis_for_task(task_id, video_path):
     if task_id == 1:
@@ -49,9 +53,15 @@ def analyze_single_recording():
       "recording_url": "https://..."
     }
     """
-    data = request.get_json()
     if request.method == 'OPTIONS':
-        return '', 204
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
+    data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data received"}), 400
 
@@ -64,11 +74,14 @@ def analyze_single_recording():
 
     result = run_analysis_for_task(task_id, video_path)
 
-    return jsonify({
+    response = jsonify({
         "recording_id": recording_id,
         "task_id": task_id,
         "metrics": result
     })
+    response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
+    response.headers.add("Access-Control-Allow-Credentials", "true")
+    return response
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)
