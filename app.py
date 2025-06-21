@@ -1,7 +1,6 @@
 import re
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
-from TimedUpGo import analyze_sit_to_stand
 from HandPronation import flip_flops
 from FistOpenClose import count_fist_openClose
 from fingertap import count_taps
@@ -43,7 +42,7 @@ def run_analysis_for_task(task_id, video_path):
     elif task_id == 6:
         result = {"steps": 25}
     elif task_id == 7:
-        result = analyze_sit_to_stand(video_path)
+        result = {"steps": 25}
     elif task_id == 8:
         result = count_taps(video_path)
     elif task_id == 9:
