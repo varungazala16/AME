@@ -15,8 +15,6 @@ allowed_origins = [
     "https://automovementexam.netlify.app/" 
 ]
 
-
-
 # 2. Use this list in your CORS setup.
 CORS(app,
      origins=allowed_origins,
@@ -24,7 +22,7 @@ CORS(app,
 # Updated CORS configuration
 CORS(app,
      supports_credentials=True,
-     resources={r"/*": {"origins": "http://localhost:5173"}},
+     origins= allowed_origins,
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "OPTIONS"])
 
