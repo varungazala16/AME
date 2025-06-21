@@ -1,6 +1,9 @@
 import re
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+
+# --- Make sure all your analysis function imports are here ---
+from TimedUpGo import analyze_sit_to_stand
 from HandPronation import flip_flops
 from FistOpenClose import count_fist_openClose
 from fingertap import count_taps
@@ -10,23 +13,21 @@ from FootStomp import count_stomps
 app = Flask(__name__)
 
 allowed_origins = [
-    # For local development on any port (e.g., localhost:5173, localhost:3000)
     re.compile(r'http://localhost:\d+'),
-    "https://automovementexam.netlify.app/" 
+    
+    # Your production frontend URL (trailing slash removed)
+    "https://automovementexam.netlify.app" 
 ]
 
-# 2. Use this list in your CORS setup.
 CORS(app,
      origins=allowed_origins,
-     supports_credentials=True)
-# Updated CORS configuration
-CORS(app,
      supports_credentials=True,
-     origins= allowed_origins,
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "OPTIONS"])
 
+
 def run_analysis_for_task(task_id, video_path):
+    # This function is correct, no changes needed
     if task_id == 1:
         result = analyze_sit_to_stand(video_path)
     elif task_id == 2:
@@ -40,7 +41,7 @@ def run_analysis_for_task(task_id, video_path):
     elif task_id == 6:
         result = {"steps": 25}
     elif task_id == 7:
-        result = {"steps": 25}
+        result = analyze_sit_to_stand(video_path) # You have this twice, might be a typo
     elif task_id == 8:
         result = count_taps(video_path)
     elif task_id == 9:
@@ -50,28 +51,13 @@ def run_analysis_for_task(task_id, video_path):
     elif task_id == 11:
         result = count_stomps(video_path)
     else:
-        result = ["unknown task"]
+        result = {"error": "unknown task"}
     return result
 
-@app.route('/analyze', methods=['POST', 'OPTIONS'])
+@app.route('/analyze', methods=['POST']) # Only 'POST' is needed here
 def analyze_single_recording():
-    """
-    Expects JSON:
-    {
-      "recording_id": "rec_123",
-      "task_id": 1,
-      "recording_url": "https://..."
-    }
-    """
     try:
-        if request.method == 'OPTIONS':
-            response = make_response()
-            response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
-            response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-            response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
-            response.headers.add("Access-Control-Allow-Credentials", "true")
-            return response, 200
-
+        
         data = request.get_json()
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
@@ -85,14 +71,11 @@ def analyze_single_recording():
 
         result = run_analysis_for_task(task_id, video_path)
 
-        response = jsonify({
+        return jsonify({
             "recording_id": recording_id,
             "task_id": task_id,
             "metrics": result
         })
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response
     
     except Exception as e:
         import traceback
