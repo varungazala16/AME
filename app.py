@@ -1,3 +1,4 @@
+import re
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from TimedUpGo import analyze_sit_to_stand
@@ -9,6 +10,18 @@ from FootStomp import count_stomps
 
 app = Flask(__name__)
 
+allowed_origins = [
+    # For local development on any port (e.g., localhost:5173, localhost:3000)
+    re.compile(r'http://localhost:\d+'),
+    "https://automovementexam.netlify.app/" 
+]
+
+
+
+# 2. Use this list in your CORS setup.
+CORS(app,
+     origins=allowed_origins,
+     supports_credentials=True)
 # Updated CORS configuration
 CORS(app,
      supports_credentials=True,
