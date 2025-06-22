@@ -1,7 +1,7 @@
 import cv2
 import mediapipe as mp
 
-def count_stomps_left(video_path, start_time_sec=0.0, end_time_sec=None):
+def count_stomps_left(video_path):
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
@@ -23,18 +23,9 @@ def count_stomps_left(video_path, start_time_sec=0.0, end_time_sec=None):
     DROP_THRESHOLD = 0.75
     WINDOW_SIZE = 4
 
-    # Seek to start time in milliseconds
-    cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
-
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            break
-
-        current_time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-        if current_time_sec < start_time_sec:
-            continue
-        if end_time_sec is not None and current_time_sec > end_time_sec:
             break
 
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -57,9 +48,9 @@ def count_stomps_left(video_path, start_time_sec=0.0, end_time_sec=None):
                     stomp_in_progress = False
 
     cap.release()
-    return stomp_count
+    return [str(stomp_count)]
 
-def count_stomps_right(video_path, start_time_sec=0.0, end_time_sec=None):
+def count_stomps_right(video_path):
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
@@ -81,18 +72,9 @@ def count_stomps_right(video_path, start_time_sec=0.0, end_time_sec=None):
     DROP_THRESHOLD = 0.75
     WINDOW_SIZE = 4
 
-    # Seek to start time in milliseconds
-    cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
-
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            break
-
-        current_time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-        if current_time_sec < start_time_sec:
-            continue
-        if end_time_sec is not None and current_time_sec > end_time_sec:
             break
 
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -115,9 +97,4 @@ def count_stomps_right(video_path, start_time_sec=0.0, end_time_sec=None):
                     stomp_in_progress = False
 
     cap.release()
-    return stomp_count
-
-def count_stomps(video_path):
-    stomps_left = count_stomps_left(video_path,4.0,14.0)
-    stomps_right = count_stomps_right(video_path,23.0,34.0)
-    return [str(stomps_left), str(stomps_right)]
+    return [str(stomp_count)]

@@ -1,18 +1,18 @@
 import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from HandPronation import flip_flops
+from TimedUpGo import analyze_sit_to_stand
+from HandPronation import count_flip_flops
 from FistOpenClose import count_fist_openClose
 from fingertap import count_taps
 from RombergOutstretch import analyze_romberg_outstretch
-from FootStomp import count_stomps
+from FootStomp import count_stomps_left,count_stomps_right
+
 
 app = Flask(__name__)
 
 allowed_origins = [
     re.compile(r'http://localhost:\d+'),
-    
-    # Your production frontend URL (trailing slash removed)
     "https://automovementexam.netlify.app" 
 ]
 
@@ -24,32 +24,65 @@ CORS(app,
 
 
 def run_analysis_for_task(task_id, video_path):
-    # This function is correct, no changes needed
     if task_id == 1:
-        result = {"steps": 25}
+        result = analyze_sit_to_stand(video_path)  # Timed Up and Go
+
     elif task_id == 2:
-        result = {"correct_count": 7}
+        result = {"correct_count": 7}  # Dual Attention
+
     elif task_id == 3:
-        result = {"steps": 12}
+        result = {"steps": 12}  # Tandem Gait
+
     elif task_id == 4:
-        result = analyze_romberg_outstretch(video_path)
+        result = analyze_romberg_outstretch(video_path)  # Arms Outstretched Eyes Closed
+
     elif task_id == 5:
-        result = {"duration": 8}
+        result = {"time": 20}  # Stand On One Foot, Right
+
     elif task_id == 6:
-        result = {"steps": 25}
+        result = {"steps": 25}  # March to the Beat - Slow
+
     elif task_id == 7:
-        result = {"steps": 25}
+        result = {"steps": 25}   # Foot Tap, Right
+
     elif task_id == 8:
-        result = count_taps(video_path)
+        result = count_taps(video_path)  # Finger Tap, Right
+
     elif task_id == 9:
-        result = flip_flops(video_path)
+        result = count_flip_flops(video_path, side='right')  # Hand Pronation, Right
+
     elif task_id == 10:
-        result = count_fist_openClose(video_path)
+        result = count_fist_openClose(video_path)  # Fist Open and Close, Right
+
     elif task_id == 11:
-        result = count_stomps(video_path)
+        result = count_stomps_right(video_path)  # Foot Stomp, Right
+
+    elif task_id == 12:
+        result = {"steps": 28}  # March to the Beat - Fast
+
+    elif task_id == 13:
+        result = {"time": 20}   # Stand On One Foot, Left
+
+    elif task_id == 14:
+        result = {"steps": 25}  # Foot Tap, Left
+
+    elif task_id == 15:
+        result = count_taps(video_path)  # Finger Tap, Left
+
+    elif task_id == 16:
+        result = count_stomps_left(video_path)  # Foot Stomp, Left
+
+    elif task_id == 17:
+        result = count_flip_flops(video_path, side='left')  # Hand Pronation, Left
+
+    elif task_id == 18:
+        result = count_fist_openClose(video_path)  # Fist Open and Close, Left
+
     else:
-        result = {"error": "unknown task"}
+        result = {"error": "Unknown task ID"}
+
     return result
+
 
 @app.route('/analyze', methods=['POST']) # Only 'POST' is needed here
 def analyze_single_recording():

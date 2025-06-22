@@ -71,7 +71,7 @@ class FingerTapDetector:
             
         return is_tap
     
-    def process_video(self, start_time_sec=0.0, end_time_sec=None):
+    def process_video(self):
         cap = cv2.VideoCapture(self.video_path)
         if not cap.isOpened():
             print("❌ Error: Could not open video.")
@@ -83,9 +83,6 @@ class FingerTapDetector:
             fps = 30
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         print(f"🎬 Processing video at {fps:.1f} FPS, total frames: {total_frames}")
-
-        # Seek to start time
-        cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
 
         # Initialize MediaPipe
         mp_hands = mp.solutions.hands
@@ -108,13 +105,6 @@ class FingerTapDetector:
 
                 frame_idx += 1
                 time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-
-                if time_sec < start_time_sec:
-                    continue
-
-                # Stop if beyond end time
-                if end_time_sec is not None and time_sec > end_time_sec:
-                    break
 
                 # Convert to RGB and process
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -161,12 +151,10 @@ def count_taps(video_path):
     print(f"📁 Video file: {video_path}")
     
     try:
-        detectorL = FingerTapDetector(video_path)
-        tap_countL = detectorL.process_video(6.0, 16.0)
-        detectorR = FingerTapDetector(video_path)
-        tap_countR = detectorR.process_video(28.0, 38.0)
-        print(f"\n✅ FINAL RESULT: {tap_countL} and {tap_countR} finger taps detected")
-        return [str(tap_countL), str(tap_countR)]
+        detector = FingerTapDetector(video_path)
+        tap_count = detector.process_video()
+        print(f"\n✅ FINAL RESULT: {tap_count} finger taps detected")
+        return [str(tap_count)]
     
     except Exception as e:
         print(f"❌ Error during processing: {e}")

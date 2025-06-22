@@ -3,7 +3,7 @@ import mediapipe as mp
 import numpy as np
 from collections import deque
 
-def count_flip_flops(video_path, hand, start_time_sec=0.0, end_time_sec=None):
+def count_flip_flops(video_path, hand):
 
     HAND_TO_TRACK = hand.lower()
     if HAND_TO_TRACK not in ['left', 'right']:
@@ -32,9 +32,6 @@ def count_flip_flops(video_path, hand, start_time_sec=0.0, end_time_sec=None):
     if fps <= 1e-2:
         fps = 30.0
 
-    # Seek to start time
-    cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
-
     flip_flop_count = 0
     current_state = "neutral"
     state_history = deque(maxlen=DEBOUNCE_FRAMES)
@@ -45,14 +42,7 @@ def count_flip_flops(video_path, hand, start_time_sec=0.0, end_time_sec=None):
         if not ret:
             break
 
-        frame_idx += 1
-        timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-
-        if timestamp < start_time_sec:
-            continue
-
-        if end_time_sec is not None and timestamp > end_time_sec:
-            break
+        frame_idx += 1        
 
         h, w = frame.shape[:2]
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -102,10 +92,4 @@ def count_flip_flops(video_path, hand, start_time_sec=0.0, end_time_sec=None):
 
     cap.release()
     hands.close()
-    return flip_flop_count
-
-
-def flip_flops(video_path):
-    left_pronation = count_flip_flops(video_path,"left", 5, 15) 
-    right_pronation = count_flip_flops(video_path,"right", 24, 34)
-    return [str(left_pronation), str(right_pronation)]
+    return [str(flip_flop_count)]

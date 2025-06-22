@@ -53,7 +53,7 @@ class FistClosureDetector:
         self.fist_count = 0
         self.debug = True   # Set to True for print statements, False for silent
 
-    def process_video(self, start_time_sec=0.0, end_time_sec=None):
+    def process_video(self):
         cap = cv2.VideoCapture(self.video_path)
         if not cap.isOpened():
             print("Error opening video.")
@@ -62,9 +62,6 @@ class FistClosureDetector:
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps <= 1e-2:
             fps = 30.0
-
-        # Seek to start time (in milliseconds)
-        cap.set(cv2.CAP_PROP_POS_MSEC, start_time_sec * 1000)
 
         stable_buffer = deque(maxlen=2)
         stable_state = None
@@ -84,12 +81,6 @@ class FistClosureDetector:
 
                 frame_idx += 1
                 timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-
-                if timestamp < start_time_sec:
-                    continue
-
-                if end_time_sec is not None and timestamp > end_time_sec:
-                    break
 
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 result = hands.process(rgb)
@@ -119,10 +110,8 @@ class FistClosureDetector:
         return fist_count
 
 def count_fist_openClose(video_path):
-    detectorL = FistClosureDetector(video_path)
-    fist_countL = detectorL.process_video(4,14)
-    detectorR = FistClosureDetector(video_path)
-    fist_countR = detectorR.process_video(25,35)
-    return [str(fist_countL), str(fist_countR)]
+    detector = FistClosureDetector(video_path)
+    fist_count = detector.process_video()
+    return [str(fist_count)]
 
 
