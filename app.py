@@ -7,6 +7,11 @@ from FistOpenClose import count_fist_openClose
 from fingertap import count_taps
 from RombergOutstretch import analyze_romberg_outstretch
 from FootStomp import count_stomps_left,count_stomps_right
+from FootTapLeft import analyze_left_foot_taps
+from FootTapRight import analyze_right_foot_taps
+from StandOnOneFootLeft import analyze_left_leg_stand
+from StandOnOneFootRight import analyze_right_leg_stand
+from AriseFromChair import analyze_sit_to_stand_RFC
 
 
 app = Flask(__name__)
@@ -37,13 +42,13 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_romberg_outstretch(video_path)  # Arms Outstretched Eyes Closed
 
     elif task_id == 5:
-        result = {"time": 20}  # Stand On One Foot, Right
+        result = analyze_right_leg_stand(video_path) # Stand On One Foot, Right
 
     elif task_id == 6:
         result = {"steps": 25}  # March to the Beat - Slow
 
     elif task_id == 7:
-        result = {"steps": 25}   # Foot Tap, Right
+        result = analyze_right_foot_taps(video_path)  # Foot Tap, Right
 
     elif task_id == 8:
         result = count_taps(video_path)  # Finger Tap, Right
@@ -61,10 +66,10 @@ def run_analysis_for_task(task_id, video_path):
         result = {"steps": 28}  # March to the Beat - Fast
 
     elif task_id == 13:
-        result = {"time": 20}   # Stand On One Foot, Left
+        result = analyze_left_leg_stand(video_path)   # Stand On One Foot, Left
 
     elif task_id == 14:
-        result = {"steps": 25}  # Foot Tap, Left
+        result = analyze_left_foot_taps(video_path) # Foot Tap, Left
 
     elif task_id == 15:
         result = count_taps(video_path)  # Finger Tap, Left
@@ -77,6 +82,9 @@ def run_analysis_for_task(task_id, video_path):
 
     elif task_id == 18:
         result = count_fist_openClose(video_path)  # Fist Open and Close, Left
+
+    elif task_id == 19:
+        result = analyze_sit_to_stand_RFC(video_path)  # Arise from chair
 
     else:
         result = {"error": "Unknown task ID"}
