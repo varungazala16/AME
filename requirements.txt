@@ -4,3 +4,4 @@ gunicorn
 opencv-python
 mediapipe
 numpy
+whisper
