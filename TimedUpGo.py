@@ -62,14 +62,10 @@ def analyze_tug_test(video_path, show_video=False):
         except: return None, None
 
     # --- Video Input Validation ---
-    if not os.path.exists(video_path):
-        # This print is useful for server-side debugging
-        print(f"Error: The specified video file was not found: {video_path}")
-        return None
-        
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print(f"Error: Could not open video file {video_path} for analysis.")
+        # This will now be the primary error check for both local files and URLs
+        print(f"Error: Could not open video source: {video_path}")
         return None
     
     # --- Analysis State Variables ---
