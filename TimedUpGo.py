@@ -178,34 +178,10 @@ def analyze_tug_from_video(video_path: str, show_video: bool = True):
             # Draw pose landmarks on the frame
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-            
-            # Display status text
-            state_text = {STATE_SITTING: "SITTING", STATE_STANDING: "STANDING", STATE_TRANSITIONING: "TRANSITIONING"}.get(current_state, "UNKNOWN")
-            if is_confirming_stand: state_text += " (Confirming...)"
-            cv2.putText(frame, f"State: {state_text}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            cv2.putText(frame, f"Time: {current_time_sec:.2f}s", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,0), 2)
-            
-            if final_tug_time is not None:
-                timer_text = f"TUG Time: {final_tug_time:.2f}s (Finished)"
-                timer_color = (0, 255, 0)
-            elif tug_timer_running:
-                elapsed = current_time_sec - first_confirmed_stand_up_time
-                timer_text = f"TUG Timer: {elapsed:.2f}s"
-                timer_color = (255, 128, 0)
-            else:
-                timer_text = "TUG Timer: Not Started"
-                timer_color = (0, 0, 255)
-            cv2.putText(frame, timer_text, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, timer_color, 2)
-
-            cv2.imshow('TUG Test Analysis', frame)
-            if cv2.waitKey(5) & 0xFF == 27: # Press ESC to exit
-                break
-
+           
     # --- Cleanup and Result Generation ---
     cap.release()
     pose_estimator.close()
-    if show_video:
-        cv2.destroyAllWindows()
 
     print("\n--- Analysis Complete ---")
     if final_tug_time:
