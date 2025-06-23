@@ -79,6 +79,9 @@ def analyze_tug_test(video_path, show_video=False):
 
     is_confirming_stand = False
     tug_timer_running = False
+
+     # Initialize the final return value to None
+    final_result_list = None
     
     hip_y_history_for_confirmation = []
     hip_x_history_for_confirmation = []
@@ -172,5 +175,7 @@ def analyze_tug_test(video_path, show_video=False):
             # Convert final metrics to string format
             final_time_str = f"{final_tug_time:.2f}"
             stand_up_str = f"{first_confirmed_stand_up_time:.2f}"
+             # Initialize the final return value to None
+            final_result_list = [stand_up_str,final_time_str] 
             
-    return [stand_up_str,final_time_str]
+    return final_result_list
