@@ -116,4 +116,4 @@ def analyze_left_leg_stand(video_path,
             sway_events_str
         ])
 
-    return concatenated_string
+    return [total_standing_time_str]

@@ -109,4 +109,4 @@ def analyze_right_foot_taps(video_path,
         pose.close()
         if show_video: cv2.destroyAllWindows()
 
-    return str(tap_count)
+    return [str(tap_count)]

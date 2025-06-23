@@ -5,25 +5,6 @@ import os
 import time
 
 def analyze_tug_test(video_path, show_video=False):
-    """
-    Analyzes an existing video file for the Timed Up and Go (TUG) test.
-
-    This function is self-contained and designed to be imported into a server or
-    another script. It preserves the original analysis logic, processing a video to find a
-    confirmed stand-up event, timing the duration until a final sit-down event,
-    and returning the results as a single string.
-
-    Args:
-        video_path (str): The full path to a LOCAL video file to be analyzed.
-        show_video (bool, optional): For local debugging only. If True, displays the
-                                     video with live annotations. Defaults to False.
-
-    Returns:
-        str: A single string containing the final results, separated by ' | '.
-             Format: "final_tug_time | stand_up_timestamp | sit_down_timestamp"
-             Example: "12.34 | 2.56 | 14.90"
-             Returns None if the video fails to open or if the test is not completed.
-    """
     # --- MediaPipe Pose Setup (inside function for encapsulation) ---
     mp_pose = mp.solutions.pose
     pose_estimator = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
@@ -105,8 +86,6 @@ def analyze_tug_test(video_path, show_video=False):
     
     hip_y_history_for_confirmation = []
     hip_x_history_for_confirmation = []
-    
-    final_result_string = None
 
     try:
         while cap.isOpened():
@@ -193,14 +172,9 @@ def analyze_tug_test(video_path, show_video=False):
 
         # Check if the test was successfully completed
         if final_tug_time is not None and first_confirmed_stand_up_time is not None:
-            sit_down_event_time = first_confirmed_stand_up_time + final_tug_time
             
             # Convert final metrics to string format
             final_time_str = f"{final_tug_time:.2f}"
             stand_up_str = f"{first_confirmed_stand_up_time:.2f}"
-            sit_down_str = f"{sit_down_event_time:.2f}"
             
-            # Concatenate into a single string for the return value
-            final_result_string = f"{final_time_str} | {stand_up_str} | {sit_down_str}"
-            
-    return final_result_string
+    return [stand_up_str,final_time_str]
