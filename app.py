@@ -12,7 +12,7 @@ from FootTapRight import analyze_right_foot_taps
 from StandOnOneFootLeft import analyze_left_leg_stand
 from StandOnOneFootRight import analyze_right_leg_stand
 from AriseFromChair import analyze_sit_to_stand_RFC
-
+from dual_attention import extract_audio_and_analyze_speech
 
 app = Flask(__name__)
 
@@ -33,7 +33,7 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_tug_from_video(video_path)  # Timed Up and Go
 
     elif task_id == 2:
-        result = {"correct_count": 7}  # Dual Attention
+        result = extract_audio_and_analyze_speech(video_path)  # Dual Attention
 
     elif task_id == 3:
         result = {"steps": 12}  # Tandem Gait
