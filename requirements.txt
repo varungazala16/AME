@@ -4,5 +4,7 @@ gunicorn
 opencv-python
 mediapipe
 numpy
-whisper
+git+https://github.com/openai/whisper.git
 word2number
+ffmpeg-python
+python-3.11.8
