@@ -7,4 +7,3 @@ numpy
 git+https://github.com/openai/whisper.git
 word2number
 ffmpeg-python
-python
