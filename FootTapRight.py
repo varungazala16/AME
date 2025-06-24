@@ -37,7 +37,6 @@ def analyze_right_foot_taps(video_path,
     h_orig = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     w_orig = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     target_width = 480  # A good default for pose estimation
-    h_orig, w_orig, _ = frame.shape
     scale = target_width / w_orig
     new_h, new_w = int(h_orig * scale), int(w_orig * scale)
     frame_resized = cv2.resize(frame, (new_w, new_h))
