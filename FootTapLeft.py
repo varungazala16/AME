@@ -27,7 +27,7 @@ def analyze_left_foot_taps(video_path,
     """
     # --- MediaPipe Pose Initialization ---
     mp_pose = mp.solutions.pose
-    pose = mp_pose.Pose(model_complexity=2, min_detection_confidence=0.7, min_tracking_confidence=0.7)
+    pose = mp_pose.Pose(model_complexity=1, min_detection_confidence=0.7, min_tracking_confidence=0.7)
         
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
