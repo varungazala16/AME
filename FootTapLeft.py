@@ -34,19 +34,6 @@ def analyze_left_foot_taps(video_path,
         print(f"ERROR: Could not open the video file '{video_path}' for processing.")
         return None
 
-    h_orig = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    w_orig = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    target_width = 480  # A good default for pose estimation
-    scale = target_width / w_orig
-    new_h, new_w = int(h_orig * scale), int(w_orig * scale)
-    frame_resized = cv2.resize(frame, (new_w, new_h))
-    
-    h, w = frame_resized.shape[:2]
-    if h == 0 or w == 0:
-        cap.release()
-        pose.close()
-        return None
-
     # --- State and Result Variables for LEFT foot ---
     tap_count = 0
     index_tap_in_progress = False
@@ -57,6 +44,19 @@ def analyze_left_foot_taps(video_path,
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret: break
+
+            target_width = 480  # A good default for pose estimation
+            h_orig, w_orig, _ = frame.shape
+            scale = target_width / w_orig
+            new_h, new_w = int(h_orig * scale), int(w_orig * scale)
+            frame_resized = cv2.resize(frame, (new_w, new_h))
+            frame_resized = cv2.resize(frame, (new_w, new_h))
+            
+            h, w = frame_resized.shape[:2]
+            if h == 0 or w == 0:
+                cap.release()
+                pose.close()
+                return None
 
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = pose.process(image_rgb)
