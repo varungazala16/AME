@@ -27,15 +27,22 @@ def analyze_left_foot_taps(video_path,
     """
     # --- MediaPipe Pose Initialization ---
     mp_pose = mp.solutions.pose
-    pose = mp_pose.Pose(model_complexity=1, min_detection_confidence=0.7, min_tracking_confidence=0.7)
+    pose = mp_pose.Pose(model_complexity=0, min_detection_confidence=0.7, min_tracking_confidence=0.7)
         
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print(f"ERROR: Could not open the video file '{video_path}' for processing.")
         return None
 
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h_orig = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    w_orig = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    target_width = 480  # A good default for pose estimation
+    h_orig, w_orig, _ = frame.shape
+    scale = target_width / w_orig
+    new_h, new_w = int(h_orig * scale), int(w_orig * scale)
+    frame_resized = cv2.resize(frame, (new_w, new_h))
+    
+    h, w = frame_resized.shape[:2]
     if h == 0 or w == 0:
         cap.release()
         pose.close()
