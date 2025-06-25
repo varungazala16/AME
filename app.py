@@ -2,7 +2,7 @@ import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from TimedUpGo import analyze_tug_from_video
-from HandPronation import count_flip_flops
+from HandPronation import count_flips_from_video
 from FistOpenClose import count_fist_openClose
 from fingertap import count_taps
 from RombergOutstretch import analyze_romberg_outstretch
@@ -55,7 +55,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_taps(video_path)  # Finger Tap, Right
 
     elif task_id == 9:
-        result = count_flip_flops(video_path, side='right')  # Hand Pronation, Right
+        result = count_flips_from_video(video_path, side='left')  # Hand Pronation, Right
 
     elif task_id == 10:
         result = count_fist_openClose(video_path)  # Fist Open and Close, Right
@@ -79,7 +79,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_stomps_left(video_path)  # Foot Stomp, Left
 
     elif task_id == 17:
-        result = count_flip_flops(video_path, side='left')  # Hand Pronation, Left
+        result = count_flips_from_video(video_path, side='right')  # Hand Pronation, Left
 
     elif task_id == 18:
         result = count_fist_openClose(video_path)  # Fist Open and Close, Left
