@@ -1,0 +1,10 @@
+# .gitignore
+
+# Ignore the downloaded model cache directory
+modelMTTB/
+
+# Other good things to ignore
+__pycache__/
+*.pyc
+venv/
+.venv/
