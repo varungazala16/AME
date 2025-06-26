@@ -55,7 +55,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_taps(video_path)  # Finger Tap, Right
 
     elif task_id == 9:
-        result = count_flips_from_video(video_path, side='left')  # Hand Pronation, Right
+        result = count_flips_from_video(video_path, hand_to_track='left')  # Hand Pronation, Right
 
     elif task_id == 10:
         result = count_fist_openClose(video_path)  # Fist Open and Close, Right
@@ -79,7 +79,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_stomps_left(video_path)  # Foot Stomp, Left
 
     elif task_id == 17:
-        result = count_flips_from_video(video_path, side='right')  # Hand Pronation, Left
+        result = count_flips_from_video(video_path, hand_to_track='right')  # Hand Pronation, Left
 
     elif task_id == 18:
         result = count_fist_openClose(video_path)  # Fist Open and Close, Left
