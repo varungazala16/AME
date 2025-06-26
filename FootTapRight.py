@@ -8,8 +8,8 @@ def analyze_right_foot_taps(video_path,
                             show_video=False, 
                             raise_threshold=0.00028, 
                             drop_threshold=0.00028, 
-                            heel_grounded_threshold=0.0008, 
-                            heel_invalidation_threshold=0.003):
+                            heel_grounded_threshold=0.0005, 
+                            heel_invalidation_threshold=0.002):
     """
     Analyzes a video to count the number of RIGHT foot taps with a grounded heel.
 
