@@ -4,11 +4,27 @@ import numpy as np
 import os
 
 def analyze_tug_from_video(video_path: str, show_video: bool = True):
+    """
+    Analyzes a video of a Timed Up and Go (TUG) test to measure the duration.
 
+    Args:
+        video_path (str): The path to the video file to be analyzed.
+        show_video (bool): If True, displays the video with real-time analysis overlays.
+                           Defaults to True.
+
+    Returns:
+        list: A list containing [start_time, duration, status, end_time].
+              - 'status' can be 'success', 'incomplete', or 'failure'.
+              - 'NA' is used for values that could not be determined.
+    """
     # --- Mediapipe Pose Setup ---
     mp_pose = mp.solutions.pose
     pose_estimator = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
     mp_drawing = mp.solutions.drawing_utils
+    
+    # --- Drawing Specs for better visibility ---
+    landmark_drawing_spec = mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=2)
+    connection_drawing_spec = mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2)
 
     # --- State Definitions ---
     STATE_UNKNOWN = -1
@@ -154,7 +170,7 @@ def analyze_tug_from_video(video_path: str, show_video: bool = True):
                 hip_y_history_for_confirmation.append(current_hip_y)
                 hip_x_history_for_confirmation.append(current_hip_x)
 
-                if len(hip_y_history_for_confirmation) == CONFIRMATION_WINDOW_FRAMES:
+                if len(hip_y_history_for_confirmation) >= CONFIRMATION_WINDOW_FRAMES:
                     y_range = np.max(hip_y_history_for_confirmation) - np.min(hip_y_history_for_confirmation)
                     x_range = np.max(hip_x_history_for_confirmation) - np.min(hip_x_history_for_confirmation)
 
@@ -177,11 +193,54 @@ def analyze_tug_from_video(video_path: str, show_video: bool = True):
         if show_video:
             # Draw pose landmarks on the frame
             if results.pose_landmarks:
-                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                          landmark_drawing_spec, connection_drawing_spec)
+
+            # --- Create and display the analysis panel ---
+            # Add a semi-transparent overlay for better text visibility
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (5, 5), (450, 100), (20, 20, 20), -1)
+            alpha = 0.7
+            frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+
+            # 1. Display Current Pose State
+            state_map = {STATE_UNKNOWN: "UNKNOWN", STATE_SITTING: "SITTING", STATE_STANDING: "STANDING", STATE_TRANSITIONING: "TRANSITIONING"}
+            state_text = f"Pose: {state_map.get(current_state, '...loading')}"
+            cv2.putText(frame, state_text, (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            # 2. Display TUG Timer
+            timer_text = "TUG Time: --"
+            timer_color = (255, 255, 0) # Yellow for default
+            if final_tug_time:
+                timer_text = f"TUG Time: {final_tug_time:.2f}s (Complete)"
+                timer_color = (0, 255, 0) # Green for complete
+            elif tug_timer_running:
+                elapsed_time = current_time_sec - first_confirmed_stand_up_time
+                timer_text = f"TUG Time: {elapsed_time:.2f}s"
+                timer_color = (100, 255, 100) # Light green for running
+            cv2.putText(frame, timer_text, (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, timer_color, 2)
+
+            # 3. Display Overall Status
+            status_text = "Status: Waiting for stand-up"
+            if is_confirming_stand:
+                status_text = "Status: Confirming stable stand..."
+            elif first_confirmed_stand_up_time and not final_tug_time:
+                status_text = "Status: TUG test in progress..."
+            elif final_tug_time:
+                status_text = "Status: Test finished."
+            cv2.putText(frame, status_text, (15, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 255), 1)
+
+            cv2.imshow('TUG Analysis', frame)
+
+            # Allow user to quit by pressing 'q'
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
            
     # --- Cleanup and Result Generation ---
     cap.release()
     pose_estimator.close()
+    if show_video:
+        cv2.destroyAllWindows()
 
     print("\n--- Analysis Complete ---")
     if final_tug_time:
@@ -198,11 +257,11 @@ def analyze_tug_from_video(video_path: str, show_video: bool = True):
         print(message)
         return [
             str(round(first_confirmed_stand_up_time, 2)),
-            "NA"
+            "NA",
             "incomplete",
             "NA"
         ]
     else:
         message = "No confirmed stand-up was detected. TUG test did not start."
         print(message)
-        return ["NA","NA","failure","NA"]
+        return ["NA", "NA", "failure", "NA"]

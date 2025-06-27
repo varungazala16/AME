@@ -9,3 +9,4 @@ word2number
 ffmpeg-python
 tensorflow
 gdown
+tqdm

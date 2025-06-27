@@ -13,6 +13,7 @@ from StandOnOneFootLeft import analyze_left_leg_stand
 from StandOnOneFootRight import analyze_right_leg_stand
 from AriseFromChair import analyze_sit_to_stand_RFC
 from dual_attention import extract_audio_and_analyze_speech
+from TandemGait import analyze_tandem_gait
 from MTTB import marching_score
 
 app = Flask(__name__)
@@ -37,7 +38,7 @@ def run_analysis_for_task(task_id, video_path):
         result = extract_audio_and_analyze_speech(video_path)  # Dual Attention
 
     elif task_id == 3:
-        result = {"steps": 12}  # Tandem Gait
+        result = analyze_tandem_gait(video_path)  # Tandem Gait
 
     elif task_id == 4:
         result = analyze_romberg_outstretch(video_path)  # Arms Outstretched Eyes Closed

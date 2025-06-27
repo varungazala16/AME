@@ -8,8 +8,8 @@ def analyze_left_foot_taps(video_path,
                            show_video=False, 
                            raise_threshold=0.00035, 
                            drop_threshold=0.00035, 
-                           heel_grounded_threshold=0.0003, 
-                           heel_invalidation_threshold=0.001):
+                           heel_grounded_threshold=0.0005, 
+                           heel_invalidation_threshold=0.002):
     """
     Analyzes a video to count the number of LEFT foot taps with a grounded heel.
 
@@ -18,16 +18,21 @@ def analyze_left_foot_taps(video_path,
 
     Args:
         video_path (str): The full path to the video file to be analyzed.
-        show_video (bool, optional): If True, displays the video with annotations. Defaults to False.
-        (Other args): Thresholds for sensitivity tuning.
+        show_video (bool, optional): If True, displays the video with annotations.
+                                     This is very useful for tuning thresholds. Defaults to False.
+        raise_threshold (float): Sensitivity for detecting the upward foot movement.
+        drop_threshold (float): Sensitivity for detecting the downward foot movement that completes a tap.
+        heel_grounded_threshold (float): Max vertical movement allowed for the heel to be considered "grounded".
+        heel_invalidation_threshold (float): If the heel moves more than this during a tap, the tap is cancelled.
 
     Returns:
-        str: The total count of detected left foot taps as a string.
-             Returns None if the video cannot be opened.
+        list: A list containing the total count of detected left foot taps as a string, e.g., ['15'].
+              Returns None if the video cannot be opened.
     """
     # --- MediaPipe Pose Initialization ---
     mp_pose = mp.solutions.pose
-    pose = mp_pose.Pose(model_complexity=0, min_detection_confidence=0.7, min_tracking_confidence=0.7)
+    mp_drawing = mp.solutions.drawing_utils
+    pose = mp_pose.Pose(model_complexity=1, min_detection_confidence=0.7, min_tracking_confidence=0.7)
         
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -45,21 +50,21 @@ def analyze_left_foot_taps(video_path,
             ret, frame = cap.read()
             if not ret: break
 
-            target_width = 480  # A good default for pose estimation
+            # --- Frame Resizing for Efficiency ---
+            target_width = 640
             h_orig, w_orig, _ = frame.shape
+            if w_orig == 0: continue
             scale = target_width / w_orig
             new_h, new_w = int(h_orig * scale), int(w_orig * scale)
-            frame_resized = cv2.resize(frame, (new_w, new_h))
-            frame_resized = cv2.resize(frame, (new_w, new_h))
+            frame_proc = cv2.resize(frame, (new_w, new_h))
             
-            h, w = frame_resized.shape[:2]
-            if h == 0 or w == 0:
-                cap.release()
-                pose.close()
-                return None
+            h, w = frame_proc.shape[:2]
+            if h == 0 or w == 0: continue
 
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image_rgb = cv2.cvtColor(frame_proc, cv2.COLOR_BGR2RGB)
+            image_rgb.flags.writeable = False
             results = pose.process(image_rgb)
+            image_rgb.flags.writeable = True
             
             momentary_heel_is_grounded = False
 
@@ -70,6 +75,7 @@ def analyze_left_foot_taps(video_path,
                     left_foot_index_lm = landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX]
                     left_heel_lm = landmarks[mp_pose.PoseLandmark.LEFT_HEEL]
 
+                    # Reset state if landmarks are not visible
                     if left_foot_index_lm.visibility < 0.6 or left_heel_lm.visibility < 0.6:
                         previous_left_foot_index_y, previous_left_heel_y, index_tap_in_progress = None, None, False
                     else:
@@ -97,17 +103,45 @@ def analyze_left_foot_taps(video_path,
                 
                 except (IndexError, AttributeError):
                      previous_left_foot_index_y, previous_left_heel_y, index_tap_in_progress = None, None, False
-            
             else:
                 previous_left_foot_index_y, previous_left_heel_y, index_tap_in_progress = None, None, False
 
             if show_video:
-                cv2.putText(frame, f"LEFT Foot Taps: {tap_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                cv2.imshow("Left Foot Tap Analysis", frame)
+                mp_drawing.draw_landmarks(frame_proc, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                          mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=2),
+                                          mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2))
+                
+                if results.pose_landmarks:
+                    if landmarks[mp_pose.PoseLandmark.LEFT_HEEL].visibility > 0.6:
+                        heel_coords = (int(landmarks[mp_pose.PoseLandmark.LEFT_HEEL].x * w), int(landmarks[mp_pose.PoseLandmark.LEFT_HEEL].y * h))
+                        cv2.circle(frame_proc, heel_coords, 8, (255, 0, 255), -1)
+                    if landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX].visibility > 0.6:
+                        index_coords = (int(landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX].x * w), int(landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX].y * h))
+                        cv2.circle(frame_proc, index_coords, 8, (255, 255, 0), -1)
+                
+                overlay = frame_proc.copy()
+                cv2.rectangle(overlay, (5, 5), (320, 100), (20, 20, 20), -1)
+                alpha = 0.7
+                frame_proc = cv2.addWeighted(overlay, alpha, frame_proc, 1 - alpha, 0)
+                
+                cv2.putText(frame_proc, f"LEFT Foot Taps: {tap_count}", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                
+                heel_status_text = f"Heel Grounded: {momentary_heel_is_grounded}"
+                heel_color = (0, 255, 0) if momentary_heel_is_grounded else (0, 0, 255)
+                cv2.putText(frame_proc, heel_status_text, (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, heel_color, 2)
+
+                tap_status_text = f"Tap In Progress: {index_tap_in_progress}"
+                tap_color = (100, 255, 100) if index_tap_in_progress else (200, 200, 200)
+                cv2.putText(frame_proc, tap_status_text, (15, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, tap_color, 2)
+
+                cv2.imshow("Left Foot Tap Analysis", frame_proc)
                 if cv2.waitKey(1) & 0xFF == ord('q'): break
+
     finally:
         cap.release()
         pose.close()
         if show_video: cv2.destroyAllWindows()
 
+    print(f"\n--- Analysis Complete for {os.path.basename(video_path)} ---")
+    print(f">>> Total LEFT Foot Taps Detected: {tap_count} <<<")
     return [str(tap_count)]
