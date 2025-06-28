@@ -156,3 +156,29 @@ def marching_score(
         cv2.destroyAllWindows()
         
     return [str(score)]
+
+# =============================================================================
+# MAIN EXECUTION BLOCK
+# =============================================================================
+# if __name__ == "__main__":
+    
+#     # --- CONFIGURE YOUR INPUTS HERE ---
+#     video_to_analyze_url = "https://nflthqflazkgwownewrc.supabase.co/storage/v1/object/public/recordings//2025-06-28T02:14:00.169Z-task-6.webm-1751076840169"
+#     speed = "s"
+    
+#     print("--- Starting Marching Score Analysis ---")
+#     print(f"Video URL: {video_to_analyze_url}")
+#     print(f"Trial Speed: {speed}")
+    
+#     try:
+#         # --- Call the function with show=True to activate the display ---
+#         analysis_result = marching_score(
+#             video_path=video_to_analyze_url,
+#             trial_speed=speed
+#         )
+#         print("\n--- Analysis Complete ---")
+#         print(f"Final Score: {analysis_result}")
+        
+#     except Exception as e:
+#         print(f"\n--- An Error Occurred During Analysis ---")
+#         print(f"Error: {e}")

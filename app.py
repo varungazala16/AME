@@ -4,7 +4,8 @@ from flask_cors import CORS
 from TimedUpGo import analyze_tug_from_video
 from HandPronation import count_flips_from_video
 from FistOpenClose import count_fist_openClose
-from fingertap import count_taps
+from fingerTap_Left import count_left_hand_taps
+from fingrerTap_right import count_right_hand_taps
 from RombergOutstretch import analyze_romberg_outstretch
 from FootStomp import count_stomps_left,count_stomps_right
 from FootTapLeft import analyze_left_foot_taps
@@ -35,7 +36,7 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_tug_from_video(video_path)  # Timed Up and Go
 
     elif task_id == 2:
-        result = extract_audio_and_analyze_speech(video_path)  # Dual Attention
+        result = analyze_tug_from_video(video_path)  # Dual Attention
 
     elif task_id == 3:
         result = analyze_tandem_gait(video_path)  # Tandem Gait
@@ -53,7 +54,7 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_right_foot_taps(video_path)  # Foot Tap, Right
 
     elif task_id == 8:
-        result = count_taps(video_path)  # Finger Tap, Right
+        result = count_left_hand_taps(video_path)  # Finger Tap, Right
 
     elif task_id == 9:
         result = count_flips_from_video(video_path, hand_to_track='left')  # Hand Pronation, Right
@@ -74,7 +75,7 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_left_foot_taps(video_path) # Foot Tap, Left
 
     elif task_id == 15:
-        result = count_taps(video_path)  # Finger Tap, Left
+        result = count_right_hand_taps(video_path)  # Finger Tap, Left
 
     elif task_id == 16:
         result = count_stomps_left(video_path)  # Foot Stomp, Left
