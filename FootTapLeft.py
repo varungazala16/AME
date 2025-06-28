@@ -4,32 +4,32 @@ import numpy as np
 import time
 import os
 
-def analyze_left_foot_taps(video_path, 
-                           show_video=False, 
-                           raise_threshold=0.0002, 
-                           drop_threshold=0.0002, 
-                           heel_grounded_threshold=0.0005, 
-                           heel_invalidation_threshold=0.002):
-    """
-    Analyzes a video to count the number of LEFT foot taps with a grounded heel.
+def analyze_right_foot_taps(video_path, show_video=False):
+    """Wrapper function to count right foot movements with jitter elimination."""
+    return _analyze_foot_taps_robust(video_path, side='right', show_video=show_video)
 
-    This function is self-contained and designed to be imported. It processes a video
-    to detect the motion of a LEFT foot tap and returns the total count.
+def analyze_left_foot_taps(video_path, show_video=False):
+    """Wrapper function to count left foot movements with jitter elimination."""
+    return _analyze_foot_taps_robust(video_path, side='left', show_video=show_video)
+
+def _analyze_foot_taps_robust(video_path, 
+                              side,
+                              show_video=False, 
+                              jitter_threshold=0.0015,
+                              raise_threshold=0.004, 
+                              drop_threshold=0.004):
+    """
+    Robustly analyzes foot taps based ONLY on toe movement, using a two-threshold
+    system to eliminate jitter while the foot is static.
 
     Args:
-        video_path (str): The full path to the video file to be analyzed.
-        show_video (bool, optional): If True, displays the video with annotations.
-                                     This is very useful for tuning thresholds. Defaults to False.
-        raise_threshold (float): Sensitivity for detecting the upward foot movement.
-        drop_threshold (float): Sensitivity for detecting the downward foot movement that completes a tap.
-        heel_grounded_threshold (float): Max vertical movement allowed for the heel to be considered "grounded".
-        heel_invalidation_threshold (float): If the heel moves more than this during a tap, the tap is cancelled.
-
-    Returns:
-        list: A list containing the total count of detected left foot taps as a string, e.g., ['15'].
-              Returns None if the video cannot be opened.
+        video_path (str): The path to the video file.
+        side (str): 'left' or 'right'.
+        show_video (bool): If True, displays the analysis window.
+        jitter_threshold (float): Movement below this is ignored as noise for the toe.
+        raise_threshold (float): Movement must be larger than this to start a tap. Must be > jitter_threshold.
+        drop_threshold (float): Movement must be larger than this to complete a tap.
     """
-    # --- MediaPipe Pose Initialization ---
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
     pose = mp_pose.Pose(model_complexity=1, min_detection_confidence=0.7, min_tracking_confidence=0.7)
@@ -39,18 +39,18 @@ def analyze_left_foot_taps(video_path,
         print(f"ERROR: Could not open the video file '{video_path}' for processing.")
         return None
 
-    # --- State and Result Variables for LEFT foot ---
+    # --- Landmark and Variable Setup based on side ---
+    foot_index_enum = mp_pose.PoseLandmark.LEFT_FOOT_INDEX if side == 'left' else mp_pose.PoseLandmark.RIGHT_FOOT_INDEX
+    
     tap_count = 0
-    index_tap_in_progress = False
-    previous_left_foot_index_y = None
-    previous_left_heel_y = None
+    tap_in_progress = False
+    previous_foot_index_y = None
     
     try:
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret: break
 
-            # --- Frame Resizing for Efficiency ---
             target_width = 640
             h_orig, w_orig, _ = frame.shape
             if w_orig == 0: continue
@@ -62,79 +62,70 @@ def analyze_left_foot_taps(video_path,
             if h == 0 or w == 0: continue
 
             image_rgb = cv2.cvtColor(frame_proc, cv2.COLOR_BGR2RGB)
-            image_rgb.flags.writeable = False
             results = pose.process(image_rgb)
-            image_rgb.flags.writeable = True
             
-            momentary_heel_is_grounded = False
+            toe_is_stable = True
 
             if results.pose_landmarks:
                 landmarks = results.pose_landmarks.landmark
                 try:
-                    # *** USE LEFT FOOT LANDMARKS ***
-                    left_foot_index_lm = landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX]
-                    left_heel_lm = landmarks[mp_pose.PoseLandmark.LEFT_HEEL]
+                    foot_index_lm = landmarks[foot_index_enum.value]
 
-                    # Reset state if landmarks are not visible
-                    if left_foot_index_lm.visibility < 0.6 or left_heel_lm.visibility < 0.6:
-                        previous_left_foot_index_y, previous_left_heel_y, index_tap_in_progress = None, None, False
+                    if foot_index_lm.visibility < 0.6:
+                        previous_foot_index_y, tap_in_progress = None, False
                     else:
-                        current_left_foot_index_y = int(left_foot_index_lm.y * h)
-                        current_left_heel_y = int(left_heel_lm.y * h)
+                        current_foot_index_y = int(foot_index_lm.y * h)
 
-                        if previous_left_heel_y is not None:
-                            if abs(current_left_heel_y - previous_left_heel_y) <= (heel_grounded_threshold * h):
-                                momentary_heel_is_grounded = True
-                        
-                        if previous_left_foot_index_y is not None:
-                            index_movement_y = current_left_foot_index_y - previous_left_foot_index_y
-                            if not index_tap_in_progress and momentary_heel_is_grounded and index_movement_y < (-raise_threshold * h):
-                                index_tap_in_progress = True
-                            elif index_tap_in_progress and index_movement_y > (drop_threshold * h):
-                                tap_count += 1
-                                index_tap_in_progress = False
-                        
-                        if index_tap_in_progress and previous_left_heel_y is not None:
-                            if abs(current_left_heel_y - previous_left_heel_y) > (heel_invalidation_threshold * h):
-                                index_tap_in_progress = False
+                        if previous_foot_index_y is not None:
+                            # --- JITTER-PROOF LOGIC (Simplified) ---
+                            index_movement_y = current_foot_index_y - previous_foot_index_y
+                            
+                            jitter_px = jitter_threshold * h
+                            raise_px = raise_threshold * h
+                            drop_px = drop_threshold * h
+                            
+                            # STEP 1: Check if the toe is just jittering (inside the dead zone).
+                            if abs(index_movement_y) < jitter_px:
+                                toe_is_stable = True
+                            else:
+                                toe_is_stable = False
+                                # STEP 2: If the toe is moving intentionally, check for a tap.
+                                # Condition to START a tap: Large upward movement.
+                                if not tap_in_progress and index_movement_y < -raise_px:
+                                    tap_in_progress = True
+                                # Condition to COMPLETE a tap: Large downward movement.
+                                elif tap_in_progress and index_movement_y > drop_px:
+                                    tap_count += 1
+                                    tap_in_progress = False
 
-                        previous_left_foot_index_y = current_left_foot_index_y
-                        previous_left_heel_y = current_left_heel_y
+                        previous_foot_index_y = current_foot_index_y
                 
                 except (IndexError, AttributeError):
-                     previous_left_foot_index_y, previous_left_heel_y, index_tap_in_progress = None, None, False
+                     previous_foot_index_y, tap_in_progress = None, False
             else:
-                previous_left_foot_index_y, previous_left_heel_y, index_tap_in_progress = None, None, False
+                previous_foot_index_y, tap_in_progress = None, False
 
             if show_video:
-                mp_drawing.draw_landmarks(frame_proc, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                                          mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=2),
-                                          mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2))
-                
+                mp_drawing.draw_landmarks(frame_proc, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
                 if results.pose_landmarks:
-                    if landmarks[mp_pose.PoseLandmark.LEFT_HEEL].visibility > 0.6:
-                        heel_coords = (int(landmarks[mp_pose.PoseLandmark.LEFT_HEEL].x * w), int(landmarks[mp_pose.PoseLandmark.LEFT_HEEL].y * h))
-                        cv2.circle(frame_proc, heel_coords, 8, (255, 0, 255), -1)
-                    if landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX].visibility > 0.6:
-                        index_coords = (int(landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX].x * w), int(landmarks[mp_pose.PoseLandmark.LEFT_FOOT_INDEX].y * h))
-                        cv2.circle(frame_proc, index_coords, 8, (255, 255, 0), -1)
+                    if landmarks[foot_index_enum.value].visibility > 0.6:
+                        index_coords = (int(landmarks[foot_index_enum.value].x * w), int(landmarks[foot_index_enum.value].y * h))
+                        cv2.circle(frame_proc, index_coords, 8, (255, 255, 0), -1) # Cyan foot index
                 
                 overlay = frame_proc.copy()
                 cv2.rectangle(overlay, (5, 5), (320, 100), (20, 20, 20), -1)
                 alpha = 0.7
                 frame_proc = cv2.addWeighted(overlay, alpha, frame_proc, 1 - alpha, 0)
                 
-                cv2.putText(frame_proc, f"LEFT Foot Taps: {tap_count}", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                cv2.putText(frame_proc, f"{side.upper()} Foot Taps: {tap_count}", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 
-                heel_status_text = f"Heel Grounded: {momentary_heel_is_grounded}"
-                heel_color = (0, 255, 0) if momentary_heel_is_grounded else (0, 0, 255)
-                cv2.putText(frame_proc, heel_status_text, (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, heel_color, 2)
+                toe_color = (0, 255, 0) if toe_is_stable else (0, 165, 255)
+                cv2.putText(frame_proc, f"Toe Stable: {toe_is_stable}", (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, toe_color, 2)
 
-                tap_status_text = f"Tap In Progress: {index_tap_in_progress}"
-                tap_color = (100, 255, 100) if index_tap_in_progress else (200, 200, 200)
-                cv2.putText(frame_proc, tap_status_text, (15, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, tap_color, 2)
+                tap_color = (100, 255, 100) if tap_in_progress else (200, 200, 200)
+                cv2.putText(frame_proc, f"Tap In Progress: {tap_in_progress}", (15, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.6, tap_color, 2)
 
-                cv2.imshow("Left Foot Tap Analysis", frame_proc)
+                cv2.imshow(f"{side.capitalize()} Foot Tap Analysis", frame_proc)
                 if cv2.waitKey(1) & 0xFF == ord('q'): break
 
     finally:
@@ -142,6 +133,8 @@ def analyze_left_foot_taps(video_path,
         pose.close()
         if show_video: cv2.destroyAllWindows()
 
-    print(f"\n--- Analysis Complete for {os.path.basename(video_path)} ---")
-    print(f">>> Total LEFT Foot Taps Detected: {tap_count} <<<")
+    print(f"\n--- Analysis Complete for {os.path.basename(video_path)} ({side.upper()}) ---")
+    print(f">>> Total {side.upper()} Foot Taps Detected: {tap_count} <<<")
     return [str(tap_count)]
+
+
