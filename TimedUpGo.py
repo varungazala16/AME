@@ -3,7 +3,7 @@ import mediapipe as mp
 import numpy as np
 import os
 
-def analyze_tug_from_video(video_path: str, show_video: bool = True):
+def analyze_tug_from_video(video_path: str, show_video: bool = False):
     """
     Analyzes a video of a Timed Up and Go (TUG) test to measure the duration.
 
