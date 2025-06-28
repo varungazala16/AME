@@ -47,7 +47,7 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_right_leg_stand(video_path) # Stand On One Foot, Right
 
     elif task_id == 6:
-        result = marching_score(video_path, "s", child_flag = False, show=False)  # March to the Beat - Slow
+        result = marching_score(video_path, "s", is_child= False, show=False)  # March to the Beat - Slow
 
     elif task_id == 7:
         result = analyze_right_foot_taps(video_path)  # Foot Tap, Right
@@ -65,7 +65,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_stomps_right(video_path)  # Foot Stomp, Right
 
     elif task_id == 12:
-        result = marching_score(video_path, "f", child_flag = False, show=False)  # March to the Beat - Fast
+        result = marching_score(video_path, "f", is_child= False, show=False)  # March to the Beat - Fast
 
     elif task_id == 13:
         result = analyze_left_leg_stand(video_path)   # Stand On One Foot, Left
