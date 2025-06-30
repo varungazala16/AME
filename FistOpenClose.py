@@ -2,13 +2,6 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import math
-import os
-from collections import deque
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
 
 FINGERS = {
     "index": [5, 6, 7, 8],
@@ -31,87 +24,45 @@ def calculate_finger_curl(landmarks, finger):
     wrist = np.array([landmarks[0].x, landmarks[0].y, landmarks[0].z])
     return (angle1 > 20 and angle2 > 20) or (np.linalg.norm(tip - wrist) < np.linalg.norm(mcp - wrist))
 
-def calculate_thumb_curl(landmarks):
-    cmc = np.array([landmarks[1].x, landmarks[1].y, landmarks[1].z])
-    mcp = np.array([landmarks[2].x, landmarks[2].y, landmarks[2].z])
-    ip  = np.array([landmarks[3].x, landmarks[3].y, landmarks[3].z])
-    tip = np.array([landmarks[4].x, landmarks[4].y, landmarks[4].z])
-    angle1 = angle_between(mcp - cmc, ip - mcp)
-    angle2 = angle_between(ip - mcp, tip - ip)
-    hand_size = np.linalg.norm(np.array([landmarks[0].x - landmarks[9].x, landmarks[0].y - landmarks[9].y]))
-    thumb_dist = np.linalg.norm(tip - np.array([landmarks[5].x, landmarks[5].y, landmarks[5].z]))
-    return (angle1 > 15 and angle2 > 15) or (thumb_dist / hand_size < 0.5)
-
-def is_fist(landmarks):
+def is_fist_no_thumb(landmarks):
     curls = [calculate_finger_curl(landmarks, FINGERS[f]) for f in FINGERS]
-    thumb = calculate_thumb_curl(landmarks)
-    return sum(curls) >= 2 and thumb
+    return sum(curls) >= 2
 
-class FistClosureDetector:
-    def __init__(self, video_path):
-        self.video_path = video_path
-        self.fist_count = 0
-        self.debug = True   # Set to True for print statements, False for silent
+def count_fist_closures(video_path):
+    mp_hands = mp.solutions.hands
 
-    def process_video(self):
-        cap = cv2.VideoCapture(self.video_path)
-        if not cap.isOpened():
-            print("Error opening video.")
-            return 0
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print("Error opening video file.")
+        return
 
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 1e-2:
-            fps = 30.0
+    fist_closed_prev = False
+    fist_closure_count = 0
 
-        stable_buffer = deque(maxlen=2)
-        stable_state = None
-        fist_count = 0
-        frame_idx = 0
+    with mp_hands.Hands(
+        static_image_mode=False,
+        max_num_hands=1,
+        min_detection_confidence=0.3,
+        min_tracking_confidence=0.3
+    ) as hands:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            result = hands.process(frame_rgb)
+            fist_closed = False
 
-        with mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=2,
-            min_detection_confidence=0.3,
-            min_tracking_confidence=0.3
-        ) as hands:
-            while True:
-                ret, frame = cap.read()
-                if not ret:
+            if result.multi_hand_landmarks:
+                for hand_landmarks in result.multi_hand_landmarks:
+                    if is_fist_no_thumb(hand_landmarks.landmark):
+                        fist_closed = True
                     break
 
-                frame_idx += 1
-                timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            if not fist_closed_prev and fist_closed:
+                fist_closure_count += 1
 
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                result = hands.process(rgb)
+            fist_closed_prev = fist_closed
 
-                current_state = "open"
-                if result.multi_hand_landmarks:
-                    for hand in result.multi_hand_landmarks:
-                        if is_fist(hand.landmark):
-                            current_state = "closed"
-                            break  # Only one closed hand is enough to count
-
-                stable_buffer.append(current_state)
-
-                if stable_buffer.count("closed") >= 1:
-                    if stable_state != "closed":
-                        fist_count += 1
-                        if self.debug:
-                            print(f"Frame {frame_idx} ({timestamp:.2f}s): Fist Closed")
-                    stable_state = "closed"
-                elif stable_buffer.count("open") >= 1:
-                    stable_state = "open"
-
-        cap.release()
-
-        if self.debug:
-            print(f"Final fist closure count: {fist_count}")
-        return fist_count
-
-def count_fist_openClose(video_path):
-    detector = FistClosureDetector(video_path)
-    fist_count = detector.process_video()
-    return [str(fist_count)]
-
-
+    cap.release()
+    return [str(fist_closure_count)]

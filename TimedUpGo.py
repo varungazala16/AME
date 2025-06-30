@@ -6,6 +6,7 @@ import os
 def analyze_tug_from_video(video_path: str, show_video: bool = False):
     """
     Analyzes a video of a Timed Up and Go (TUG) test to measure the duration.
+    This version measures to the *last* detected sit-down event.
 
     Args:
         video_path (str): The path to the video file to be analyzed.
@@ -22,7 +23,6 @@ def analyze_tug_from_video(video_path: str, show_video: bool = False):
     pose_estimator = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
     mp_drawing = mp.solutions.drawing_utils
     
-    # --- Drawing Specs for better visibility ---
     landmark_drawing_spec = mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=2)
     connection_drawing_spec = mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2)
 
@@ -41,7 +41,6 @@ def analyze_tug_from_video(video_path: str, show_video: bool = False):
     # --- Helper Functions (nested for encapsulation) ---
     def classify_pose(landmarks):
         try:
-            # Extract landmark coordinates
             left_hip = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
             right_hip = landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value]
             left_knee = landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value]
@@ -51,19 +50,16 @@ def analyze_tug_from_video(video_path: str, show_video: bool = False):
             left_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value]
             right_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value]
 
-            # Calculate average y-coordinates
             hip_y = (left_hip.y + right_hip.y) / 2
             knee_y = (left_knee.y + right_knee.y) / 2
             ankle_y = (left_ankle.y + right_ankle.y) / 2
             shoulder_y = (left_shoulder.y + right_shoulder.y) / 2
 
-            # Calculate vertical distances for classification logic
             shoulder_hip_dist = abs(shoulder_y - hip_y)
-            if shoulder_hip_dist < 1e-6: shoulder_hip_dist = 1.0 # Avoid division by zero
+            if shoulder_hip_dist < 1e-6: shoulder_hip_dist = 1.0
             hip_ankle_dist = abs(hip_y - ankle_y)
             hip_knee_diff = hip_y - knee_y
 
-            # Logic to classify pose based on relative landmark positions
             if hip_ankle_dist < shoulder_hip_dist * 1.3:
                 return STATE_SITTING
             elif hip_knee_diff < -0.05:
@@ -83,7 +79,6 @@ def analyze_tug_from_video(video_path: str, show_video: bool = False):
         try:
             left_hip = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
             right_hip = landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value]
-            # Use average if both are visible, otherwise fall back to one
             if left_hip.visibility > 0.5 and right_hip.visibility > 0.5:
                 return (left_hip.x + right_hip.x) / 2, (left_hip.y + right_hip.y) / 2
             elif left_hip.visibility > 0.5:
@@ -111,17 +106,15 @@ def analyze_tug_from_video(video_path: str, show_video: bool = False):
     hip_y_history_for_confirmation = []
     hip_x_history_for_confirmation = []
     tug_timer_running = False
-    final_tug_time = None
+    final_tug_duration = None # Renamed for clarity
 
     while cap.isOpened():
         success, frame = cap.read()
         if not success:
-            break # End of video
+            break
 
-        # Get the timestamp of the current frame from the video file
         current_time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
 
-        # Process the frame with MediaPipe
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image_rgb.flags.writeable = False
         results = pose_estimator.process(image_rgb)
@@ -133,38 +126,36 @@ def analyze_tug_from_video(video_path: str, show_video: bool = False):
             frame_state = classify_pose(results.pose_landmarks.landmark)
             current_hip_x, current_hip_y = get_avg_hip_coords(results.pose_landmarks.landmark)
         
-        # --- State Machine and TUG Timer Logic ---
         state_buffer.append(frame_state)
         if len(state_buffer) > BUFFER_LEN:
             state_buffer.pop(0)
 
-        # Determine a stable state from the buffer to reduce noise
         stable_state = current_state
         if len(state_buffer) == BUFFER_LEN:
             valid_states = [s for s in state_buffer if s in [STATE_SITTING, STATE_STANDING]]
             if valid_states:
                 stable_state = max(set(valid_states), key=valid_states.count)
 
-        # Detect state transitions
         if stable_state != current_state:
-            # Transition from SITTING to STANDING: A potential start of the TUG test
             if current_state == STATE_SITTING and stable_state == STATE_STANDING and not is_confirming_stand and first_confirmed_stand_up_time is None:
                 is_confirming_stand = True
                 candidate_stand_up_time = current_time_sec
                 hip_y_history_for_confirmation.clear()
                 hip_x_history_for_confirmation.clear()
             
-            # Transition from STANDING to SITTING: The end of the TUG test
+            # ### MODIFICATION START ###
+            # This logic now allows the end time to be continuously updated.
             elif current_state == STATE_STANDING and stable_state == STATE_SITTING:
                 if tug_timer_running:
-                    final_tug_time = current_time_sec - first_confirmed_stand_up_time
-                    tug_timer_running = False
+                    # Overwrite the duration with the time of the latest sit-down event.
+                    final_tug_duration = current_time_sec - first_confirmed_stand_up_time
+                    # The line `tug_timer_running = False` is REMOVED to allow updates.
                 if is_confirming_stand:
-                    is_confirming_stand = False # Abort confirmation if they sit back down
+                    is_confirming_stand = False
+            # ### MODIFICATION END ###
 
             current_state = stable_state
 
-        # Confirmation logic for a valid stand-up event
         if is_confirming_stand and current_state == STATE_STANDING:
             if current_hip_x is not None and current_hip_y is not None:
                 hip_y_history_for_confirmation.append(current_hip_y)
@@ -174,81 +165,67 @@ def analyze_tug_from_video(video_path: str, show_video: bool = False):
                     y_range = np.max(hip_y_history_for_confirmation) - np.min(hip_y_history_for_confirmation)
                     x_range = np.max(hip_x_history_for_confirmation) - np.min(hip_x_history_for_confirmation)
 
-                    # Check for vertical stability and horizontal movement
                     if y_range < HIP_Y_STABILITY_THRESHOLD and x_range > HIP_X_MOVEMENT_THRESHOLD:
                         if first_confirmed_stand_up_time is None:
                             first_confirmed_stand_up_time = candidate_stand_up_time
                             tug_timer_running = True
                             print(f"Time: {first_confirmed_stand_up_time:.2f}s - SUCCESSFUL STAND-UP CONFIRMED. TUG TIMER STARTED.")
                         is_confirming_stand = False
-                    # Shift the window
                     hip_y_history_for_confirmation.pop(0)
                     hip_x_history_for_confirmation.pop(0)
         
-        # Abort confirmation if state changes during the confirmation window
         elif is_confirming_stand and current_state != STATE_STANDING:
             is_confirming_stand = False
 
-        # --- Visualization (if enabled) ---
         if show_video:
-            # Draw pose landmarks on the frame
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                                           landmark_drawing_spec, connection_drawing_spec)
-
-            # --- Create and display the analysis panel ---
-            # Add a semi-transparent overlay for better text visibility
             overlay = frame.copy()
             cv2.rectangle(overlay, (5, 5), (450, 100), (20, 20, 20), -1)
             alpha = 0.7
             frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
-
-            # 1. Display Current Pose State
+            
             state_map = {STATE_UNKNOWN: "UNKNOWN", STATE_SITTING: "SITTING", STATE_STANDING: "STANDING", STATE_TRANSITIONING: "TRANSITIONING"}
             state_text = f"Pose: {state_map.get(current_state, '...loading')}"
             cv2.putText(frame, state_text, (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-            # 2. Display TUG Timer
             timer_text = "TUG Time: --"
-            timer_color = (255, 255, 0) # Yellow for default
-            if final_tug_time:
-                timer_text = f"TUG Time: {final_tug_time:.2f}s (Complete)"
-                timer_color = (0, 255, 0) # Green for complete
+            timer_color = (255, 255, 0)
+            if final_tug_duration:
+                timer_text = f"TUG Time: {final_tug_duration:.2f}s"
+                timer_color = (0, 255, 0)
             elif tug_timer_running:
                 elapsed_time = current_time_sec - first_confirmed_stand_up_time
                 timer_text = f"TUG Time: {elapsed_time:.2f}s"
-                timer_color = (100, 255, 100) # Light green for running
+                timer_color = (100, 255, 100)
             cv2.putText(frame, timer_text, (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, timer_color, 2)
 
-            # 3. Display Overall Status
             status_text = "Status: Waiting for stand-up"
             if is_confirming_stand:
                 status_text = "Status: Confirming stable stand..."
-            elif first_confirmed_stand_up_time and not final_tug_time:
+            elif first_confirmed_stand_up_time and not final_tug_duration:
                 status_text = "Status: TUG test in progress..."
-            elif final_tug_time:
-                status_text = "Status: Test finished."
+            elif final_tug_duration:
+                status_text = "Status: Test complete."
             cv2.putText(frame, status_text, (15, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 255), 1)
-
+            
             cv2.imshow('TUG Analysis', frame)
-
-            # Allow user to quit by pressing 'q'
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
            
-    # --- Cleanup and Result Generation ---
     cap.release()
     pose_estimator.close()
     if show_video:
         cv2.destroyAllWindows()
 
     print("\n--- Analysis Complete ---")
-    if final_tug_time:
-        end_time = first_confirmed_stand_up_time + final_tug_time
-        print(f">>> TOTAL TUG DURATION: {final_tug_time:.2f} seconds <<<")
+    if final_tug_duration:
+        end_time = first_confirmed_stand_up_time + final_tug_duration
+        print(f">>> TOTAL TUG DURATION: {final_tug_duration:.2f} seconds <<<")
         return [
             str(round(first_confirmed_stand_up_time, 2)),
-            str(round(final_tug_time, 2)),
+            str(round(final_tug_duration, 2)),
             "success",
             str(round(end_time, 2))
         ]

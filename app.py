@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from TimedUpGo import analyze_tug_from_video
 from HandPronation import count_flips_from_video
-from FistOpenClose import count_fist_openClose
+from FistOpenClose import count_fist_closures
 from fingerTap_Left import count_left_hand_taps
 from fingrerTap_right import count_right_hand_taps
 from RombergOutstretch import analyze_romberg_outstretch
@@ -13,8 +13,6 @@ from FootTapRight import analyze_right_foot_taps
 from StandOnOneFootLeft import analyze_left_leg_stand
 from StandOnOneFootRight import analyze_right_leg_stand
 from AriseFromChair import analyze_sit_to_stand_RFC
-from dual_attention import extract_audio_and_analyze_speech
-from fist_closures import count_fist_closures
 from TandemGait import analyze_tandem_gait
 from MTTB import marching_score
 
