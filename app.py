@@ -1,7 +1,7 @@
 import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from TimedUpGo import analyze_tug_from_video
+from TimedUpGo import analyze_tug_from_video, dual_attention
 from HandPronation import count_flips_from_video
 from FistOpenClose import count_fist_closures
 from fingerTap_Left import count_left_hand_taps
@@ -35,7 +35,7 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_tug_from_video(video_path)  # Timed Up and Go
 
     elif task_id == 2:
-        result = analyze_tug_from_video(video_path)  # Dual Attention
+        result = dual_attention(video_path)  # Dual Attention
 
     elif task_id == 3:
         result = analyze_tandem_gait(video_path)  # Tandem Gait
