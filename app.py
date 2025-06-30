@@ -14,6 +14,7 @@ from StandOnOneFootLeft import analyze_left_leg_stand
 from StandOnOneFootRight import analyze_right_leg_stand
 from AriseFromChair import analyze_sit_to_stand_RFC
 from dual_attention import extract_audio_and_analyze_speech
+from fist_closures import count_fist_closures
 from TandemGait import analyze_tandem_gait
 from MTTB import marching_score
 
@@ -60,7 +61,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_flips_from_video(video_path, hand_to_track='left')  # Hand Pronation, Right
 
     elif task_id == 10:
-        result = count_fist_openClose(video_path)  # Fist Open and Close, Right
+        result = count_fist_closures(video_path)  # Fist Open and Close, Right
 
     elif task_id == 11:
         result = count_stomps_right(video_path)  # Foot Stomp, Right
@@ -84,7 +85,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_flips_from_video(video_path, hand_to_track='right')  # Hand Pronation, Left
 
     elif task_id == 18:
-        result = count_fist_openClose(video_path)  # Fist Open and Close, Left
+        result = count_fist_closures(video_path)  # Fist Open and Close, Left
 
     elif task_id == 19:
         result = analyze_sit_to_stand_RFC(video_path)  # Arise from chair
