@@ -14,7 +14,8 @@ from StandOnOneFootLeft import analyze_left_leg_stand
 from StandOnOneFootRight import analyze_right_leg_stand
 from AriseFromChair import analyze_sit_to_stand_RFC
 from TandemGait import analyze_tandem_gait
-from MTTB import marching_score
+from MTTB_Fast import analyze_marching_beats
+from MTTB_Slow import analyze_marching_beats_slow
 
 app = Flask(__name__)
 
@@ -47,7 +48,7 @@ def run_analysis_for_task(task_id, video_path):
         result = analyze_right_leg_stand(video_path) # Stand On One Foot, Right
 
     elif task_id == 6:
-        result = marching_score(video_path, "s", is_child= False, show=False)  # March to the Beat - Slow
+        result = analyze_marching_beats_slow(video_path, show_video=False)  # March to the Beat - Slow
 
     elif task_id == 7:
         result = analyze_right_foot_taps(video_path)  # Foot Tap, Right
@@ -65,7 +66,7 @@ def run_analysis_for_task(task_id, video_path):
         result = count_stomps_right(video_path)  # Foot Stomp, Right
 
     elif task_id == 12:
-        result = marching_score(video_path, "f", is_child= False, show=False)  # March to the Beat - Fast
+        result = analyze_marching_beats(video_path, show_video=False)  # March to the Beat - Fast
 
     elif task_id == 13:
         result = analyze_left_leg_stand(video_path)   # Stand On One Foot, Left
