@@ -165,4 +165,4 @@ def analyze_marching_beats_slow(video_path, show_video=True):
     results_to_return = [str(count) for count in interval_data]
     results_to_return.append(str(total_beats))
 
-    return rythm_beats
+    return [str(rythm_beats)]
